@@ -1,0 +1,19 @@
+{
+	"ImportPath": "github.com/cloudfoundry-incubator/docker-circus",
+	"GoVersion": "go1.3",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/onsi/ginkgo",
+			"Comment": "v1.1.0-1-g32204a3",
+			"Rev": "32204a3eab0576cbea19f5ff8b27d3a928647ea6"
+		},
+		{
+			"ImportPath": "github.com/onsi/gomega",
+			"Comment": "v1.0",
+			"Rev": "a78ae492d53aad5a7a232d0d0462c14c400e3ee7"
+		}
+	]
+}
