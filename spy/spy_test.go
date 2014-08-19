@@ -19,7 +19,7 @@ var _ = Describe("Spy", func() {
 
 	BeforeEach(func() {
 		var err error
-		check, err = gexec.Build("github.com/cloudfoundry-incubator/linux-circus/spy")
+		check, err = gexec.Build("github.com/cloudfoundry-incubator/docker-circus/spy")
 		Ω(err).ShouldNot(HaveOccurred())
 
 		server = ghttp.NewServer()
