@@ -20,7 +20,6 @@ import (
 
 var _ = Describe("Tailor helpers", func() {
 	var (
-		dockerImageURL string
 		server         *ghttp.Server
 		endpoint1      *ghttp.Server
 		endpoint2      *ghttp.Server
@@ -71,9 +70,94 @@ var _ = Describe("Tailor helpers", func() {
 		return resultInfo
 	}
 
+	Describe("ParseDockerURL", func() {
+		It("should return a repo and tag", func() {
+			parts, _ := url.Parse("docker://foobar:5123/baz/bot#test")
+			repoName, tag := helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
+			Ω(tag).Should(Equal("test"))
+
+			parts, _ = url.Parse("docker:///baz/bot#test")
+			repoName, tag = helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("baz/bot"))
+			Ω(tag).Should(Equal("test"))
+
+			parts, _ = url.Parse("docker:///bot#test")
+			repoName, tag = helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("bot"))
+			Ω(tag).Should(Equal("test"))
+
+			parts, _ = url.Parse("docker:///xyz#123")
+			repoName, tag = helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("xyz"))
+			Ω(tag).Should(Equal("123"))
+
+			parts, _ = url.Parse("docker:///a:123/b/c#456")
+			repoName, tag = helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("a:123/b/c"))
+			Ω(tag).Should(Equal("456"))
+		})
+		
+		It("should default to the latest tag", func() {
+			parts, _ := url.Parse("docker://a/b/c#latest")
+			repoName, tag := helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("a/b/c"))
+			Ω(tag).Should(Equal("latest"))
+
+			parts, _ = url.Parse("docker://foobar:5123/baz/bot")
+			repoName, tag = helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
+			Ω(tag).Should(Equal("latest"))
+
+			parts, _ = url.Parse("docker:///baz/bot")
+			repoName, tag = helpers.ParseDockerURL(parts)
+			Ω(repoName).Should(Equal("baz/bot"))
+			Ω(tag).Should(Equal("latest"))
+		})
+	})
+
+	Describe("ParseDockerRef", func() {
+		It("should return a repo and tag", func() {
+			repoName, tag := helpers.ParseDockerRef("foobar:5123/baz/bot:test")
+			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
+			Ω(tag).Should(Equal("test"))
+
+			repoName, tag = helpers.ParseDockerRef("baz/bot:test")
+			Ω(repoName).Should(Equal("baz/bot"))
+			Ω(tag).Should(Equal("test"))
+
+			repoName, tag = helpers.ParseDockerRef("bot:test")
+			Ω(repoName).Should(Equal("bot"))
+			Ω(tag).Should(Equal("test"))
+
+			repoName, tag = helpers.ParseDockerRef("xyz:123")
+			Ω(repoName).Should(Equal("xyz"))
+			Ω(tag).Should(Equal("123"))
+
+			repoName, tag = helpers.ParseDockerRef("a:123/b/c:456")
+			Ω(repoName).Should(Equal("a:123/b/c"))
+			Ω(tag).Should(Equal("456"))
+		})
+
+		It("should default to the latest tag", func() {
+			repoName, tag := helpers.ParseDockerRef("a/b/c")
+			Ω(repoName).Should(Equal("a/b/c"))
+			Ω(tag).Should(Equal("latest"))
+
+			repoName, tag = helpers.ParseDockerRef("foobar:5123/baz/bot")
+			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
+			Ω(tag).Should(Equal("latest"))
+
+			repoName, tag = helpers.ParseDockerRef("baz/bot")
+			Ω(repoName).Should(Equal("baz/bot"))
+			Ω(tag).Should(Equal("latest"))
+		})
+	})
+
 	Describe("FetchMetadata", func() {
 		var registryHost string
-		var parts *url.URL
+		var repoName string
+		var tag string
 
 		BeforeEach(func() {
 			server = ghttp.NewServer()
@@ -82,19 +166,19 @@ var _ = Describe("Tailor helpers", func() {
 
 			parts, _ := url.Parse(server.URL())
 			registryHost = parts.Host
-		})
 
-		JustBeforeEach(func() {
-			parts, _ = url.Parse(dockerImageURL)
+			repoName = ""
+			tag = "latest"
 		})
 
 		Context("with an invalid host", func() {
 			BeforeEach(func() {
 				setupPingableRegistry()
-				dockerImageURL = "docker://qwer:5123/some_user/some_repo"
+				repoName = "qwer:5123/some_user/some_repo"
 			})
+
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(parts)
+				_, err := helpers.FetchMetadata(repoName, tag)
 				Ω(err).Should(HaveOccurred())
 			})
 		})
@@ -102,10 +186,10 @@ var _ = Describe("Tailor helpers", func() {
 		Context("with an unknown repository", func() {
 			BeforeEach(func() {
 				setupPingableRegistry()
-				dockerImageURL = "docker://" + registryHost + "/some_user/not_some_repo"
+				repoName = registryHost + "/some_user/not_some_repo"
 			})
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(parts)
+				_, err := helpers.FetchMetadata(repoName, tag)
 				Ω(err).Should(HaveOccurred())
 			})
 		})
@@ -113,10 +197,11 @@ var _ = Describe("Tailor helpers", func() {
 		Context("with an unknown tag", func() {
 			BeforeEach(func() {
 				setupPingableRegistry()
-				dockerImageURL = "docker://" + registryHost + "/some_user/some_repo#not_some_tag"
+				repoName = registryHost + "/some_user/some_repo"
+				tag = "not_some_tag"
 			})
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(parts)
+				_, err := helpers.FetchMetadata(repoName, tag)
 				Ω(err).Should(HaveOccurred())
 			})
 		})
@@ -125,7 +210,7 @@ var _ = Describe("Tailor helpers", func() {
 			BeforeEach(func() {
 				setupRegistry()
 
-				dockerImageURL = "docker://" + registryHost + "/some_user/some_repo"
+				repoName = registryHost + "/some_user/some_repo"
 
 				endpoint1.AppendHandlers(
 					ghttp.CombineHandlers(
@@ -139,12 +224,12 @@ var _ = Describe("Tailor helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(parts)
+				_, err := helpers.FetchMetadata(repoName, tag)
 				Ω(err).ShouldNot(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(parts)
+				img, _ := helpers.FetchMetadata(repoName, tag)
 				Ω(img).ShouldNot(BeNil())
 				Ω(img.Config).ShouldNot(BeNil())
 				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "-foobar", "bazbot"}))
@@ -155,7 +240,8 @@ var _ = Describe("Tailor helpers", func() {
 			BeforeEach(func() {
 				setupRegistry()
 
-				dockerImageURL = "docker://" + registryHost + "/some_user/some_repo#some-tag"
+				repoName = registryHost + "/some_user/some_repo"
+				tag = "some-tag"
 
 				endpoint1.AppendHandlers(
 					ghttp.CombineHandlers(
@@ -169,12 +255,12 @@ var _ = Describe("Tailor helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(parts)
+				_, err := helpers.FetchMetadata(repoName, tag)
 				Ω(err).ShouldNot(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(parts)
+				img, _ := helpers.FetchMetadata(repoName, tag)
 				Ω(img).ShouldNot(BeNil())
 				Ω(img.Config).ShouldNot(BeNil())
 				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "arg1", "arg2"}))

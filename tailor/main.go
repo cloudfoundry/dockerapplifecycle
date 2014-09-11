@@ -18,6 +18,12 @@ func main() {
 		"docker image uri in docker://[registry/][scope/]repository[#tag] format",
 	)
 
+	dockerRef := flagSet.String(
+		"dockerRef",
+		"",
+		"docker image reference in standard docker string format",
+	)
+
 	outputFilename := flagSet.String(
 		"outputMetadataJSONFilename",
 		"/tmp/result/result.json",
@@ -29,18 +35,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *dockerImageUrl == "" {
-		println("missing flag: dockerImageUrl")
-		usage()
+	var repoName string 
+	var tag string
+	if len(*dockerImageUrl) > 0 {
+		parts, err := url.Parse(*dockerImageUrl)
+		if err != nil {
+			println("invalid dockerImageUrl: " + *dockerImageUrl)
+			flagSet.PrintDefaults()
+			os.Exit(1)
+		}
+		repoName, tag = helpers.ParseDockerURL(parts)
+	} else if len(*dockerRef) > 0 {
+		repoName, tag = helpers.ParseDockerRef(*dockerRef)
+	} else {
+		println("missing flag: dockerImageUrl or dockerRef required")
+		flagSet.PrintDefaults()
+		os.Exit(1)
 	}
 
-	parts, err := url.Parse(*dockerImageUrl)
-	if err != nil {
-		println("invalid dockerImageUrl: " + *dockerImageUrl)
-		usage()
-	}
-
-	img, err := helpers.FetchMetadata(parts)
+	img, err := helpers.FetchMetadata(repoName, tag)
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)
@@ -52,13 +65,8 @@ func main() {
 		info.Entrypoint = img.Config.Entrypoint
 	}
 
-	if helpers.SaveMetadata(*outputFilename, &info) != nil {
+	if err := helpers.SaveMetadata(*outputFilename, &info); err != nil {
 		println(err.Error())
 		os.Exit(1)
 	}
-}
-
-func usage() {
-	flag.PrintDefaults()
-	os.Exit(1)
 }

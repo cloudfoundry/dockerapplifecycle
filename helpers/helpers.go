@@ -12,19 +12,43 @@ import (
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 
 	"github.com/docker/docker/image"
+	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/docker/registry"
 	"github.com/docker/docker/utils"
 )
 
-func FetchMetadata(parts *url.URL) (*image.Image, error) {
-	var dockerRef string
-	if len(parts.Host) == 0 {
-		dockerRef = strings.TrimPrefix(parts.Path, "/")
+// For docker:// URLs
+func ParseDockerURL(parts *url.URL) (string, string) {
+	var tag string
+	if len(parts.Fragment) > 0 {
+		tag = parts.Fragment
 	} else {
-		dockerRef = parts.Host + parts.Path
+		tag = "latest"
 	}
 
-	hostname, repoName, err := registry.ResolveRepositoryName(dockerRef)
+	var repoName string
+	if len(parts.Host) == 0 {
+		repoName = strings.TrimPrefix(parts.Path, "/")
+	} else {
+		repoName = parts.Host + parts.Path
+	}
+
+	return repoName, tag 
+}
+
+// For standard docker image references expressed as a protocol-less string
+func ParseDockerRef(dockerRef string) (string, string) {
+	repoName, tag := parsers.ParseRepositoryTag(dockerRef)
+
+	if len(tag) == 0 {
+		tag = "latest"
+	}
+
+	return repoName, tag
+}
+
+func FetchMetadata(repoName string, tag string) (*image.Image, error) {
+	hostname, repoName, err := registry.ResolveRepositoryName(repoName)
 	if err != nil {
 		return nil, err
 	}
@@ -38,13 +62,6 @@ func FetchMetadata(parts *url.URL) (*image.Image, error) {
 	session, err := registry.NewSession(authConfig, utils.NewHTTPRequestFactory(), endpoint, true)
 	if err != nil {
 		return nil, err
-	}
-
-	var tag string
-	if len(parts.Fragment) > 0 {
-		tag = parts.Fragment
-	} else {
-		tag = "latest"
 	}
 
 	repoData, err := session.GetRepositoryData(repoName)
