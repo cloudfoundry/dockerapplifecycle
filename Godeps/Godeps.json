@@ -7,7 +7,7 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "f3bf350692eaed6efae7ee1074f99d35edc2ff67"
+			"Rev": "2684a76dd3cd3652bc95f3b90e2320c6be6626d4"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/api",

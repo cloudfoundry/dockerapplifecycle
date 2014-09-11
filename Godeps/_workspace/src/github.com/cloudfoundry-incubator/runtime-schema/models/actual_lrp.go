@@ -1,6 +1,9 @@
 package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+)
 
 type ActualLRPState int
 
@@ -27,6 +30,31 @@ type ActualLRP struct {
 
 	State ActualLRPState `json:"state"`
 	Since int64          `json:"since"`
+}
+
+func NewActualLRP(processGuid, instanceGuid, executorID string, index int, state ActualLRPState, since int64) (ActualLRP, error) {
+	if processGuid == "" {
+		return ActualLRP{}, errors.New("Cannot construct Acutal LRP with empty process guid")
+	}
+
+	if instanceGuid == "" {
+		return ActualLRP{}, errors.New("Cannot construct Acutal LRP with empty instance guid")
+	}
+
+	if executorID == "" {
+		return ActualLRP{}, errors.New("Cannot construct Acutal LRP with empty executor ID")
+	}
+
+	return ActualLRP{
+		ProcessGuid:  processGuid,
+		InstanceGuid: instanceGuid,
+		ExecutorID:   executorID,
+
+		Index: index,
+
+		State: state,
+		Since: since,
+	}, nil
 }
 
 func NewActualLRPFromJSON(payload []byte) (ActualLRP, error) {

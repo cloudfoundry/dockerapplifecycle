@@ -82,4 +82,42 @@ var _ = Describe("ActualLRP", func() {
 			})
 		}
 	})
+
+	Describe("NewActualLRP", func() {
+		It("returns a LRP with correct fields", func() {
+			actualLrp, err := NewActualLRP("processGuid", "instanceGuid", "executorID", 0, ActualLRPStateStarting, 1138)
+			Ω(err).ShouldNot(HaveOccurred())
+
+			Ω(actualLrp.ProcessGuid).Should(Equal("processGuid"))
+			Ω(actualLrp.InstanceGuid).Should(Equal("instanceGuid"))
+			Ω(actualLrp.ExecutorID).Should(Equal("executorID"))
+			Ω(actualLrp.Index).Should(BeZero())
+			Ω(actualLrp.State).Should(Equal(ActualLRPStateStarting))
+			Ω(actualLrp.Since).Should(Equal(int64(1138)))
+		})
+
+		Context("When given a blank process guid", func() {
+			It("returns an error indicating so", func() {
+				_, err := NewActualLRP("", "instanceGuid", "executorID", 0, ActualLRPStateStarting, 1138)
+				Ω(err).Should(HaveOccurred())
+				Ω(err.Error()).Should(Equal("Cannot construct Acutal LRP with empty process guid"))
+			})
+		})
+
+		Context("When given a blank instance guid", func() {
+			It("returns an error indicating so", func() {
+				_, err := NewActualLRP("processGuid", "", "executorID", 0, ActualLRPStateStarting, 1138)
+				Ω(err).Should(HaveOccurred())
+				Ω(err.Error()).Should(Equal("Cannot construct Acutal LRP with empty instance guid"))
+			})
+		})
+
+		Context("When given a blank executor ID", func() {
+			It("returns an error indicating so", func() {
+				_, err := NewActualLRP("processGuid", "instanceGuid", "", 0, ActualLRPStateStarting, 1138)
+				Ω(err).Should(HaveOccurred())
+				Ω(err.Error()).Should(Equal("Cannot construct Acutal LRP with empty executor ID"))
+			})
+		})
+	})
 })
