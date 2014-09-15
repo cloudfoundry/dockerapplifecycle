@@ -1,13 +1,11 @@
 package main_test
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"regexp"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -17,94 +15,187 @@ import (
 
 var _ = Describe("Soldier", func() {
 	var appDir string
+	var soldierCmd *exec.Cmd
+	var session *gexec.Session
 
 	BeforeEach(func() {
-		var err error
+		os.Setenv("CALLERENV", "some-value")
 
+		var err error
 		appDir, err = ioutil.TempDir("", "app-dir")
 		Ω(err).ShouldNot(HaveOccurred())
+
+		soldierCmd = &exec.Cmd{
+			Path: soldier,
+			Env: append(
+				os.Environ(),
+				"PORT=8080",
+				"CF_INSTANCE_GUID=some-instance-guid",
+				"CF_INSTANCE_INDEX=123",
+				`VCAP_APPLICATION={"foo":1}`,
+			),
+		}
 	})
 
 	AfterEach(func() {
 		os.RemoveAll(appDir)
 	})
 
-	It("executes it with $HOME as the given dir", func() {
-		session, err := gexec.Start(
-			exec.Command(soldier, appDir, "echo HOME set to $HOME"),
-			GinkgoWriter,
-			GinkgoWriter,
-		)
+	JustBeforeEach(func() {
+		var err error
+		session, err = gexec.Start(soldierCmd, GinkgoWriter, GinkgoWriter)
 		Ω(err).ShouldNot(HaveOccurred())
-
-		Eventually(session).Should(gbytes.Say("HOME set to " + appDir))
 	})
 
-	It("executes it with $TMPDIR as the given dir + /tmp", func() {
-		session, err := gexec.Start(
-			exec.Command(soldier, appDir, "echo TMPDIR set to $TMPDIR"),
-			GinkgoWriter,
-			GinkgoWriter,
-		)
-		Ω(err).ShouldNot(HaveOccurred())
+	var ItExecutesTheCommandWithTheRightEnvironment = func() {
+		It("executes the start command", func() {
+			Eventually(session).Should(gbytes.Say("running app"))
+		})
 
-		Eventually(session).Should(gbytes.Say("TMPDIR set to " + appDir + "/tmp"))
+		It("executes the start command with $HOME as the given dir", func() {
+			Eventually(session).Should(gbytes.Say("HOME=" + appDir))
+		})
+
+		It("executes the start command with $TMPDIR as the given dir + /tmp", func() {
+			Eventually(session).Should(gbytes.Say("TMPDIR=" + appDir + "/tmp"))
+		})
+
+		It("executes with the environment of the caller", func() {
+			Eventually(session).Should(gbytes.Say("CALLERENV=some-value"))
+		})
+
+		It("changes to the app directory when running", func() {
+			// wildcard because PWD expands symlinks and appDir temp folder might be one
+			Eventually(session).Should(gbytes.Say("PWD=.*" + appDir))
+		})
+
+		It("munges VCAP_APPLICATION appropriately", func() {
+			Eventually(session).Should(gexec.Exit(0))
+
+			vcapAppPattern := regexp.MustCompile("VCAP_APPLICATION=(.*)")
+			vcapApplicationBytes := vcapAppPattern.FindSubmatch(session.Out.Contents())[1]
+
+			vcapApplication := map[string]interface{}{}
+			err := json.Unmarshal(vcapApplicationBytes, &vcapApplication)
+			Ω(err).ShouldNot(HaveOccurred())
+
+			Ω(vcapApplication["host"]).Should(Equal("0.0.0.0"))
+			Ω(vcapApplication["port"]).Should(Equal(float64(8080)))
+			Ω(vcapApplication["instance_index"]).Should(Equal(float64(123)))
+			Ω(vcapApplication["instance_id"]).Should(Equal("some-instance-guid"))
+			Ω(vcapApplication["foo"]).Should(Equal(float64(1)))
+		})
+	}
+
+	Context("when a start command is given", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+				"env; echo running app",
+				`{ "cmd": ["echo should not run this"] }`,
+			}
+		})
+
+		ItExecutesTheCommandWithTheRightEnvironment()
 	})
 
-	It("executes with the environment of the caller", func() {
-		os.Setenv("CALLERENV", "some-value")
+	Context("when no start command is given", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+				"",
+				`{ "cmd": ["/bin/sh", "-c", "env; echo running app"] }`,
+			}
+		})
 
-		session, err := gexec.Start(
-			exec.Command(soldier, appDir, "echo CALLERENV set to $CALLERENV"),
-			GinkgoWriter,
-			GinkgoWriter,
-		)
-		Ω(err).ShouldNot(HaveOccurred())
-
-		Eventually(session).Should(gbytes.Say("CALLERENV set to some-value"))
+		ItExecutesTheCommandWithTheRightEnvironment()
 	})
 
-	It("changes to the app directory when running", func() {
-		session, err := gexec.Start(
-			exec.Command(soldier, appDir, "echo PWD is $(pwd)"),
-			GinkgoWriter,
-			GinkgoWriter,
-		)
-		Ω(err).ShouldNot(HaveOccurred())
+	Context("when both an entrypoint and a cmd are in the metadata", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+				"",
+				`{ "entrypoint": ["/bin/echo"], "cmd": ["abc"] }`,
+			}
+		})
 
-		Eventually(session).Should(gbytes.Say("PWD is .*" + filepath.Base(appDir)))
+		It("includes the entrypoint before the cmd args", func() {
+			Eventually(session).Should(gbytes.Say("abc"))
+		})
 	})
 
-	It("munges VCAP_APPLICATION appropriately", func() {
-		outBuf := new(bytes.Buffer)
+	Context("when no start command or execution metadata is present", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+				"",
+				`{}`,
+			}
+		})
 
-		cmd := exec.Command(soldier, appDir, "echo $VCAP_APPLICATION")
-		cmd.Env = append(
-			os.Environ(),
-			"PORT=8080",
-			"CF_INSTANCE_GUID=some-instance-guid",
-			"CF_INSTANCE_INDEX=123",
-			`VCAP_APPLICATION={"foo":1}`,
-		)
+		It("errors", func() {
+			Eventually(session.Err).Should(gbytes.Say("No start command found or specified"))
+		})
+	})	
 
-		session, err := gexec.Start(
-			cmd,
-			io.MultiWriter(GinkgoWriter, outBuf),
-			GinkgoWriter,
-		)
-		Ω(err).ShouldNot(HaveOccurred())
+	ItPrintsUsageInformation := func() {
+		It("prints usage information", func() {
+			Eventually(session.Err).Should(gbytes.Say("Usage: soldier <app directory> <start command> <metadata>"))
+			Eventually(session).Should(gexec.Exit(1))
+		})
+	}
 
-		Eventually(session).Should(gexec.Exit(0))
+	Context("when no arguments are given", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+			}
+		})
 
-		vcapApplication := map[string]interface{}{}
+		ItPrintsUsageInformation()
+	})
 
-		err = json.Unmarshal(outBuf.Bytes(), &vcapApplication)
-		Ω(err).ShouldNot(HaveOccurred())
+	Context("when the start command and metadata are missing", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+			}
+		})
 
-		Ω(vcapApplication["host"]).Should(Equal("0.0.0.0"))
-		Ω(vcapApplication["port"]).Should(Equal(float64(8080)))
-		Ω(vcapApplication["instance_index"]).Should(Equal(float64(123)))
-		Ω(vcapApplication["instance_id"]).Should(Equal("some-instance-guid"))
-		Ω(vcapApplication["foo"]).Should(Equal(float64(1)))
+		ItPrintsUsageInformation()
+	})
+
+	Context("when the metadata is missing", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+				"env",
+			}
+		})
+
+		ItPrintsUsageInformation()
+	})
+
+	Context("when the given execution metadata is not valid JSON", func() {
+		BeforeEach(func() {
+			soldierCmd.Args = []string{
+				"soldier",
+				appDir,
+				"",
+				"{ not-valid-json }",
+			}
+		})
+
+		It("prints an error message", func() {
+			Eventually(session.Err).Should(gbytes.Say("Invalid metadata"))
+			Eventually(session).Should(gexec.Exit(1))
+		})
 	})
 })
