@@ -33,7 +33,7 @@ func ParseDockerURL(parts *url.URL) (string, string) {
 		repoName = parts.Host + parts.Path
 	}
 
-	return repoName, tag 
+	return repoName, tag
 }
 
 // For standard docker image references expressed as a protocol-less string
@@ -111,8 +111,15 @@ func SaveMetadata(filename string, metadata *protocol.ExecutionMetadata) error {
 
 	defer resultFile.Close()
 
+	startCommand := strings.Join(metadata.Cmd, " ")
+	if len(metadata.Entrypoint) > 0 {
+		startCommand = strings.Join([]string{strings.Join(metadata.Entrypoint, " "), startCommand}, " ")
+	}
 	err = json.NewEncoder(resultFile).Encode(models.StagingDockerResult{
 		ExecutionMetadata: string(executionMetadataJSON),
+		DetectedStartCommand: map[string]string{
+			"web": startCommand,
+		},
 	})
 	if err != nil {
 		return err

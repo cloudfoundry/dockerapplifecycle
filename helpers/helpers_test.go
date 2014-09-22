@@ -20,9 +20,9 @@ import (
 
 var _ = Describe("Tailor helpers", func() {
 	var (
-		server         *ghttp.Server
-		endpoint1      *ghttp.Server
-		endpoint2      *ghttp.Server
+		server    *ghttp.Server
+		endpoint1 *ghttp.Server
+		endpoint2 *ghttp.Server
 	)
 
 	setupPingableRegistry := func() {
@@ -97,7 +97,7 @@ var _ = Describe("Tailor helpers", func() {
 			Ω(repoName).Should(Equal("a:123/b/c"))
 			Ω(tag).Should(Equal("456"))
 		})
-		
+
 		It("should default to the latest tag", func() {
 			parts, _ := url.Parse("docker://a/b/c#latest")
 			repoName, tag := helpers.ParseDockerURL(parts)
@@ -269,12 +269,16 @@ var _ = Describe("Tailor helpers", func() {
 	})
 
 	Context("SaveMetadata", func() {
-		metadata := protocol.ExecutionMetadata{
-			Cmd:        []string{"fake-arg1", "fake-arg2"},
-			Entrypoint: []string{"fake-cmd", "fake-arg0"},
-		}
-
+		var metadata protocol.ExecutionMetadata
 		var outputDir string
+
+		BeforeEach(func() {
+			metadata = protocol.ExecutionMetadata{
+				Cmd:        []string{"fake-arg1", "fake-arg2"},
+				Entrypoint: []string{"fake-cmd", "fake-arg0"},
+			}
+		})
+
 		Context("to an unwritable path on disk", func() {
 			It("should error", func() {
 				err := helpers.SaveMetadata("////tmp/", &metadata)
@@ -303,7 +307,7 @@ var _ = Describe("Tailor helpers", func() {
 			})
 
 			Describe("the json", func() {
-				It("should contain the metadata", func() {
+				verifyMetadata := func(expectedEntryPoint []string, expectedStartCmd string) {
 					err := helpers.SaveMetadata(path.Join(outputDir, "result.json"), &metadata)
 					Ω(err).ShouldNot(HaveOccurred())
 					result := resultJSON(path.Join(outputDir, "result.json"))
@@ -313,13 +317,41 @@ var _ = Describe("Tailor helpers", func() {
 					Ω(err).ShouldNot(HaveOccurred())
 
 					Ω(stagingResult.ExecutionMetadata).ShouldNot(BeEmpty())
+					Ω(stagingResult.DetectedStartCommand).ShouldNot(BeEmpty())
 
 					var executionMetadata protocol.ExecutionMetadata
 					err = json.Unmarshal([]byte(stagingResult.ExecutionMetadata), &executionMetadata)
 					Ω(err).ShouldNot(HaveOccurred())
 
 					Ω(executionMetadata.Cmd).Should(Equal(metadata.Cmd))
-					Ω(executionMetadata.Entrypoint).Should(Equal(metadata.Entrypoint))
+					Ω(executionMetadata.Entrypoint).Should(Equal(expectedEntryPoint))
+
+					Ω(stagingResult.DetectedStartCommand).Should(HaveLen(1))
+					Ω(stagingResult.DetectedStartCommand).Should(HaveKeyWithValue("web", expectedStartCmd))
+				}
+
+				It("should contain the metadata", func() {
+					verifyMetadata(metadata.Entrypoint, "fake-cmd fake-arg0 fake-arg1 fake-arg2")
+				})
+
+				Context("when the EntryPoint is empty", func() {
+					BeforeEach(func() {
+						metadata.Entrypoint = []string{}
+					})
+
+					It("only contains the metadata cmd portion", func() {
+						verifyMetadata(nil, "fake-arg1 fake-arg2")
+					})
+				})
+
+				Context("when the EntryPoint is nil", func() {
+					BeforeEach(func() {
+						metadata.Entrypoint = nil
+					})
+
+					It("only contains the metadata cmd portion", func() {
+						verifyMetadata(metadata.Entrypoint, "fake-arg1 fake-arg2")
+					})
 				})
 			})
 		})
