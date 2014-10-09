@@ -141,7 +141,7 @@ var _ = Describe("Soldier", func() {
 		It("errors", func() {
 			Eventually(session.Err).Should(gbytes.Say("No start command found or specified"))
 		})
-	})	
+	})
 
 	ItPrintsUsageInformation := func() {
 		It("prints usage information", func() {

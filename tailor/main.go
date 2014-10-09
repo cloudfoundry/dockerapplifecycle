@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var repoName string 
+	var repoName string
 	var tag string
 	if len(*dockerImageUrl) > 0 {
 		parts, err := url.Parse(*dockerImageUrl)
