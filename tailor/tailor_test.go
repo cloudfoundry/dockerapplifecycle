@@ -77,7 +77,7 @@ var _ = Describe("Tailoring", func() {
 		dockerRef = ""
 		dockerImageURL = ""
 
-		outputMetadataDir, err = ioutil.TempDir(os.TempDir(), "tailoring-result")
+		outputMetadataDir, err = ioutil.TempDir("", "tailoring-result")
 		Ω(err).ShouldNot(HaveOccurred())
 
 		outputMetadataJSONFilename = path.Join(outputMetadataDir, "result.json")
