@@ -53,7 +53,7 @@ func FetchMetadata(repoName string, tag string) (*image.Image, error) {
 		return nil, err
 	}
 
-	endpoint, err := registry.NewEndpoint(hostname, []string{})
+	endpoint, err := registry.NewEndpoint(hostname, []string{"127.0.0.1/32"})
 	if err != nil {
 		return nil, err
 	}
