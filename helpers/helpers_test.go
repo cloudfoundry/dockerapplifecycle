@@ -8,14 +8,12 @@ import (
 	"os"
 	"path"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
-	"github.com/onsi/gomega/ghttp"
-
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/cloudfoundry-incubator/runtime-schema/models"
+	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/ginkgo"
+	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega"
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
 	"github.com/cloudfoundry-incubator/docker-circus/helpers"
 	"github.com/cloudfoundry-incubator/docker-circus/protocol"
-	"github.com/cloudfoundry-incubator/runtime-schema/models"
 )
 
 var _ = Describe("Tailor helpers", func() {

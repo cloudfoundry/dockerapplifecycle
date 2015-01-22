@@ -8,13 +8,12 @@ import (
 	"path"
 	"strings"
 
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/cloudfoundry-incubator/runtime-schema/models"
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/image"
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/pkg/parsers"
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/registry"
+	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/utils"
 	"github.com/cloudfoundry-incubator/docker-circus/protocol"
-	"github.com/cloudfoundry-incubator/runtime-schema/models"
-
-	"github.com/docker/docker/image"
-	"github.com/docker/docker/pkg/parsers"
-	"github.com/docker/docker/registry"
-	"github.com/docker/docker/utils"
 )
 
 // For docker:// URLs
