@@ -11,10 +11,6 @@
 			"Rev": "f92b7950b372b1db80bd3527e4d40e42555fe6c2"
 		},
 		{
-			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "0cb28b009ecc9f10a8199fcab2a31f67a676a3ae"
-		},
-		{
 			"ImportPath": "github.com/docker/docker/api",
 			"Comment": "v1.3.0-519-g7b7af6d",
 			"Rev": "7b7af6dbaeadb86c018a877af15c662786bc90c1"

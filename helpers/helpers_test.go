@@ -8,7 +8,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/cloudfoundry-incubator/runtime-schema/models"
+	"github.com/cloudfoundry-incubator/docker-circus"
 	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/ginkgo"
 	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega"
 	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
@@ -310,7 +310,7 @@ var _ = Describe("Tailor helpers", func() {
 					Ω(err).ShouldNot(HaveOccurred())
 					result := resultJSON(path.Join(outputDir, "result.json"))
 
-					var stagingResult models.StagingDockerResult
+					var stagingResult docker_circus.StagingDockerResult
 					err = json.Unmarshal(result, &stagingResult)
 					Ω(err).ShouldNot(HaveOccurred())
 
