@@ -274,6 +274,7 @@ var _ = Describe("Tailor helpers", func() {
 			metadata = protocol.ExecutionMetadata{
 				Cmd:        []string{"fake-arg1", "fake-arg2"},
 				Entrypoint: []string{"fake-cmd", "fake-arg0"},
+				Workdir:    "/fake-workdir",
 			}
 		})
 
@@ -323,6 +324,7 @@ var _ = Describe("Tailor helpers", func() {
 
 					Ω(executionMetadata.Cmd).Should(Equal(metadata.Cmd))
 					Ω(executionMetadata.Entrypoint).Should(Equal(expectedEntryPoint))
+					Ω(executionMetadata.Workdir).Should(Equal(metadata.Workdir))
 
 					Ω(stagingResult.DetectedStartCommand).Should(HaveLen(1))
 					Ω(stagingResult.DetectedStartCommand).Should(HaveKeyWithValue("web", expectedStartCmd))
@@ -337,7 +339,7 @@ var _ = Describe("Tailor helpers", func() {
 						metadata.Entrypoint = []string{}
 					})
 
-					It("only contains the metadata cmd portion", func() {
+					It("contains all but the EntryPoint", func() {
 						verifyMetadata(nil, "fake-arg1 fake-arg2")
 					})
 				})
@@ -347,7 +349,7 @@ var _ = Describe("Tailor helpers", func() {
 						metadata.Entrypoint = nil
 					})
 
-					It("only contains the metadata cmd portion", func() {
+					It("contains all but the EntryPoint", func() {
 						verifyMetadata(metadata.Entrypoint, "fake-arg1 fake-arg2")
 					})
 				})

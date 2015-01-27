@@ -131,7 +131,7 @@ var _ = Describe("Tailoring", func() {
 						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
 						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 							w.Header().Add("X-Docker-Size", "789")
-							w.Write([]byte(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot", "-foobar"],"Entrypoint":["/dockerapp", "-t"]}}`))
+							w.Write([]byte(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`))
 						}),
 					),
 				)
@@ -151,6 +151,7 @@ var _ = Describe("Tailoring", func() {
 
 					Ω(result).Should(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
 					Ω(result).Should(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
+					Ω(result).Should(ContainSubstring(`\"workdir\":\"/workdir\"`))
 				})
 			})
 		}

@@ -63,6 +63,7 @@ func main() {
 	if img.Config != nil {
 		info.Cmd = img.Config.Cmd
 		info.Entrypoint = img.Config.Entrypoint
+		info.Workdir = img.Config.WorkingDir
 	}
 
 	if err := helpers.SaveMetadata(*outputFilename, &info); err != nil {
