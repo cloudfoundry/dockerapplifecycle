@@ -48,7 +48,18 @@ func main() {
 		}
 	}
 
-	os.Chdir(os.Args[1])
+	var executionMetadata protocol.ExecutionMetadata
+	err = json.Unmarshal([]byte(metadata), &executionMetadata)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid metadata - %s", err)
+		os.Exit(1)
+	}
+
+	workdir := "/"
+	if executionMetadata.Workdir != "" {
+		workdir = executionMetadata.Workdir
+	}
+	os.Chdir(workdir)
 
 	if startCommand != "" {
 		syscall.Exec("/bin/sh", []string{
@@ -57,21 +68,16 @@ func main() {
 			startCommand,
 		}, os.Environ())
 	} else {
-		var executionMetadata protocol.ExecutionMetadata
-		err := json.Unmarshal([]byte(metadata), &executionMetadata)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid metadata - %s", err)
-			os.Exit(1)
-		} else if len(executionMetadata.Entrypoint) > 0 || len(executionMetadata.Cmd) > 0 {
-			// https://docs.docker.com/reference/builder/#entrypoint and
-			// https://docs.docker.com/reference/builder/#cmd dictate how Entrypoint
-			// and Cmd are treated by docker; we follow these rules here
-			argv := executionMetadata.Entrypoint
-			argv = append(argv, executionMetadata.Cmd...)
-			syscall.Exec(argv[0], argv, os.Environ())
-		} else {
+		if len(executionMetadata.Entrypoint) == 0 && len(executionMetadata.Cmd) == 0 {
 			fmt.Fprintf(os.Stderr, "No start command found or specified")
 			os.Exit(1)
 		}
+
+		// https://docs.docker.com/reference/builder/#entrypoint and
+		// https://docs.docker.com/reference/builder/#cmd dictate how Entrypoint
+		// and Cmd are treated by docker; we follow these rules here
+		argv := executionMetadata.Entrypoint
+		argv = append(argv, executionMetadata.Cmd...)
+		syscall.Exec(argv[0], argv, os.Environ())
 	}
 }
