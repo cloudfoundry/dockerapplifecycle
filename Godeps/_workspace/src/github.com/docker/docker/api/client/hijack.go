@@ -11,11 +11,11 @@ import (
 	"runtime"
 	"strings"
 
-	log "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/api"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/dockerversion"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/pkg/promise"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/pkg/term"
+	log "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/api"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/dockerversion"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/pkg/promise"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/pkg/term"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 

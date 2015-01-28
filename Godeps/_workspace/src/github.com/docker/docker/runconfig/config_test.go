@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/nat"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/nat"
 )
 
 func parse(t *testing.T, args string) (*Config, *HostConfig, error) {

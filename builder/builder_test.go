@@ -9,16 +9,16 @@ import (
 	"os/exec"
 	"path"
 
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/ginkgo"
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/gbytes"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/gexec"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gbytes"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gexec"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
 )
 
-var _ = Describe("Tailoring", func() {
+var _ = Describe("Building", func() {
 	var (
-		tailorCmd                  *exec.Cmd
+		builderCmd                 *exec.Cmd
 		dockerRef                  string
 		dockerImageURL             string
 		outputMetadataDir          string
@@ -28,9 +28,9 @@ var _ = Describe("Tailoring", func() {
 		endpoint2                  *ghttp.Server
 	)
 
-	tailor := func() *gexec.Session {
+	builder := func() *gexec.Session {
 		session, err := gexec.Start(
-			tailorCmd,
+			builderCmd,
 			GinkgoWriter,
 			GinkgoWriter,
 		)
@@ -76,7 +76,7 @@ var _ = Describe("Tailoring", func() {
 		dockerRef = ""
 		dockerImageURL = ""
 
-		outputMetadataDir, err = ioutil.TempDir("", "tailoring-result")
+		outputMetadataDir, err = ioutil.TempDir("", "building-result")
 		Ω(err).ShouldNot(HaveOccurred())
 
 		outputMetadataJSONFilename = path.Join(outputMetadataDir, "result.json")
@@ -91,13 +91,13 @@ var _ = Describe("Tailoring", func() {
 	})
 
 	JustBeforeEach(func() {
-		tailorCmd = exec.Command(tailorPath,
+		builderCmd = exec.Command(builderPath,
 			"-dockerImageUrl", dockerImageURL,
 			"-dockerRef", dockerRef,
 			"-outputMetadataJSONFilename", outputMetadataJSONFilename,
 		)
 
-		tailorCmd.Env = os.Environ()
+		builderCmd.Env = os.Environ()
 	})
 
 	resultJSON := func() []byte {
@@ -110,7 +110,7 @@ var _ = Describe("Tailoring", func() {
 	Context("when running the main", func() {
 		Context("with no docker image arg specified", func() {
 			It("should exit with an error", func() {
-				session := tailor()
+				session := builder()
 				Eventually(session.Err).Should(gbytes.Say("missing flag: dockerImageUrl or dockerRef required"))
 				Eventually(session).Should(gexec.Exit(1))
 			})
@@ -118,7 +118,7 @@ var _ = Describe("Tailoring", func() {
 
 		Context("with an invalid output path", func() {
 			It("should exit with an error", func() {
-				session := tailor()
+				session := builder()
 				Eventually(session).Should(gexec.Exit(1))
 			})
 		})
@@ -138,13 +138,13 @@ var _ = Describe("Tailoring", func() {
 			})
 
 			It("should exit successfully", func() {
-				session := tailor()
+				session := builder()
 				Eventually(session).Should(gexec.Exit(0))
 			})
 
 			Describe("the json", func() {
 				It("should contain the execution metadata", func() {
-					session := tailor()
+					session := builder()
 					Eventually(session).Should(gexec.Exit(0))
 
 					result := resultJSON()

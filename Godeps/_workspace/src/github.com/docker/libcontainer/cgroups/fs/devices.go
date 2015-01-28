@@ -1,6 +1,6 @@
 package fs
 
-import "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/libcontainer/cgroups"
+import "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/libcontainer/cgroups"
 
 type DevicesGroup struct {
 }

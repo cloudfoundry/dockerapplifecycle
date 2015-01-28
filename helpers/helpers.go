@@ -8,12 +8,12 @@ import (
 	"path"
 	"strings"
 
-	"github.com/cloudfoundry-incubator/docker-circus"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/image"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/pkg/parsers"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/registry"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/utils"
-	"github.com/cloudfoundry-incubator/docker-circus/protocol"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/image"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/pkg/parsers"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/utils"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 )
 
 // For docker:// URLs
@@ -114,7 +114,7 @@ func SaveMetadata(filename string, metadata *protocol.ExecutionMetadata) error {
 	if len(metadata.Entrypoint) > 0 {
 		startCommand = strings.Join([]string{strings.Join(metadata.Entrypoint, " "), startCommand}, " ")
 	}
-	err = json.NewEncoder(resultFile).Encode(docker_circus.StagingDockerResult{
+	err = json.NewEncoder(resultFile).Encode(docker_app_lifecycle.StagingDockerResult{
 		ExecutionMetadata: string(executionMetadataJSON),
 		DetectedStartCommand: map[string]string{
 			"web": startCommand,

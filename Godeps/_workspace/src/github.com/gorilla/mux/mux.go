@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/gorilla/context"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/gorilla/context"
 )
 
 // NewRouter returns a new router instance.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/stvp/go-udp-testing"
 )
 

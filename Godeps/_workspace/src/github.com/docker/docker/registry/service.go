@@ -1,7 +1,7 @@
 package registry
 
 import (
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/engine"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/engine"
 )
 
 // Service exposes registry capabilities in the standard Engine

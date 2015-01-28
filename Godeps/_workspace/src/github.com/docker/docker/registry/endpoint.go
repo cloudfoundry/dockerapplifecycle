@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	log "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	log "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 // scans string for api version in the URL path. returns the trimmed hostname, if version found, string and API version.

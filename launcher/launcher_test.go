@@ -8,18 +8,18 @@ import (
 	"os/exec"
 	"regexp"
 
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/ginkgo"
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/gbytes"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/gexec"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gbytes"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gexec"
 )
 
-var _ = Describe("Soldier", func() {
+var _ = Describe("Launcher", func() {
 	var (
-		appDir     string
-		soldierCmd *exec.Cmd
-		session    *gexec.Session
-		workdir    string
+		appDir      string
+		launcherCmd *exec.Cmd
+		session     *gexec.Session
+		workdir     string
 	)
 
 	BeforeEach(func() {
@@ -31,8 +31,8 @@ var _ = Describe("Soldier", func() {
 
 		workdir = "/"
 
-		soldierCmd = &exec.Cmd{
-			Path: soldier,
+		launcherCmd = &exec.Cmd{
+			Path: launcher,
 			Env: append(
 				os.Environ(),
 				"PORT=8080",
@@ -49,7 +49,7 @@ var _ = Describe("Soldier", func() {
 
 	JustBeforeEach(func() {
 		var err error
-		session, err = gexec.Start(soldierCmd, GinkgoWriter, GinkgoWriter)
+		session, err = gexec.Start(launcherCmd, GinkgoWriter, GinkgoWriter)
 		Ω(err).ShouldNot(HaveOccurred())
 	})
 
@@ -95,8 +95,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when a start command is given", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"env; echo running app",
 				`{ "cmd": ["echo should not run this"] }`,
@@ -109,8 +109,8 @@ var _ = Describe("Soldier", func() {
 	Context("when a start command is given with a workdir", func() {
 		BeforeEach(func() {
 			workdir = "/bin"
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"env; echo running app",
 				fmt.Sprintf(`{ "cmd" : ["echo should not run this"],
@@ -123,8 +123,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when no start command is given", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"",
 				`{ "cmd": ["/bin/sh", "-c", "env; echo running app"] }`,
@@ -136,8 +136,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when both an entrypoint and a cmd are in the metadata", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"",
 				`{ "entrypoint": ["/bin/echo"], "cmd": ["abc"] }`,
@@ -152,8 +152,8 @@ var _ = Describe("Soldier", func() {
 	Context("when an entrypoint, a cmd, and a workdir are all in the metadata", func() {
 		BeforeEach(func() {
 			workdir = "/bin"
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"",
 				fmt.Sprintf(`{ "entrypoint": ["./echo"], "cmd": ["abc"], "workdir" : "%s"}`, workdir),
@@ -167,8 +167,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when no start command or execution metadata is present", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"",
 				`{}`,
@@ -182,15 +182,15 @@ var _ = Describe("Soldier", func() {
 
 	ItPrintsUsageInformation := func() {
 		It("prints usage information", func() {
-			Eventually(session.Err).Should(gbytes.Say("Usage: soldier <app directory> <start command> <metadata>"))
+			Eventually(session.Err).Should(gbytes.Say("Usage: launcher <app directory> <start command> <metadata>"))
 			Eventually(session).Should(gexec.Exit(1))
 		})
 	}
 
 	Context("when no arguments are given", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 			}
 		})
 
@@ -199,8 +199,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when the start command and metadata are missing", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 			}
 		})
@@ -210,8 +210,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when the metadata is missing", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"env",
 			}
@@ -222,8 +222,8 @@ var _ = Describe("Soldier", func() {
 
 	Context("when the given execution metadata is not valid JSON", func() {
 		BeforeEach(func() {
-			soldierCmd.Args = []string{
-				"soldier",
+			launcherCmd.Args = []string{
+				"launcher",
 				appDir,
 				"",
 				"{ not-valid-json }",

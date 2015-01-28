@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	log "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	log "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 // VersionInfo is used to model entities which has a version.

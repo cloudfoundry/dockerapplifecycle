@@ -4,7 +4,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	log "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	log "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 func Unmount(target string) error {

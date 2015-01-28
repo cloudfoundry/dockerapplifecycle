@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strconv"
 
-	log "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/utils"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/gorilla/mux"
+	log "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/utils"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/gorilla/mux"
 )
 
 func newV2RegistryRouter() *mux.Router {

@@ -1,7 +1,7 @@
 package logrus_airbrake
 
 import (
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/tobi/airbrake-go"
 )
 

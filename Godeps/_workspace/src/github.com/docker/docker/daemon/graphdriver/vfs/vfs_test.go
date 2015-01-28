@@ -1,7 +1,7 @@
 package vfs
 
 import (
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/daemon/graphdriver/graphtest"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/daemon/graphdriver/graphtest"
 	"testing"
 )
 

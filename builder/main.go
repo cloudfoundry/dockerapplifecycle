@@ -5,12 +5,12 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/cloudfoundry-incubator/docker-circus/helpers"
-	"github.com/cloudfoundry-incubator/docker-circus/protocol"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 )
 
 func main() {
-	flagSet := flag.NewFlagSet("tailor", flag.ExitOnError)
+	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
 
 	dockerImageUrl := flagSet.String(
 		"dockerImageUrl",

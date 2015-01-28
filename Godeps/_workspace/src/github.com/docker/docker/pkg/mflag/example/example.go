@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	flag "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/pkg/mflag"
+	flag "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/pkg/mflag"
 )
 
 var (

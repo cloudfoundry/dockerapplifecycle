@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/libcontainer/cgroups"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/libcontainer/cgroups"
 )
 
 type FreezerGroup struct {

@@ -3,7 +3,7 @@ package cgroups
 import (
 	"fmt"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/libcontainer/devices"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/libcontainer/devices"
 )
 
 type FreezerState string

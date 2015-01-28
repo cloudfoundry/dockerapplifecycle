@@ -7,7 +7,7 @@ package mflag_test
 import (
 	"bytes"
 	"fmt"
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/pkg/mflag"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/pkg/mflag"
 	"os"
 	"sort"
 	"strings"

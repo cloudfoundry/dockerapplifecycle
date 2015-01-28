@@ -8,15 +8,15 @@ import (
 	"os"
 	"path"
 
-	"github.com/cloudfoundry-incubator/docker-circus"
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/ginkgo"
-	. "github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega"
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
-	"github.com/cloudfoundry-incubator/docker-circus/helpers"
-	"github.com/cloudfoundry-incubator/docker-circus/protocol"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 )
 
-var _ = Describe("Tailor helpers", func() {
+var _ = Describe("Builder helpers", func() {
 	var (
 		server    *ghttp.Server
 		endpoint1 *ghttp.Server
@@ -311,7 +311,7 @@ var _ = Describe("Tailor helpers", func() {
 					Ω(err).ShouldNot(HaveOccurred())
 					result := resultJSON(path.Join(outputDir, "result.json"))
 
-					var stagingResult docker_circus.StagingDockerResult
+					var stagingResult docker_app_lifecycle.StagingDockerResult
 					err = json.Unmarshal(result, &stagingResult)
 					Ω(err).ShouldNot(HaveOccurred())
 

@@ -3,7 +3,7 @@ package matchers
 import (
 	"fmt"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/onsi/gomega/format"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/format"
 )
 
 type SucceedMatcher struct {

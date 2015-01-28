@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/cloudfoundry-incubator/docker-circus/Godeps/_workspace/src/github.com/docker/docker/daemon/graphdriver"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/daemon/graphdriver"
 )
 
 var (

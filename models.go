@@ -1,4 +1,4 @@
-package docker_circus
+package docker_app_lifecycle
 
 type StagingDockerResult struct {
 	ExecutionMetadata    string            `json:"execution_metadata"`
