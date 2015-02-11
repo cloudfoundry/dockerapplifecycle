@@ -156,6 +156,7 @@ var _ = Describe("Builder helpers", func() {
 		var registryHost string
 		var repoName string
 		var tag string
+		var insecureRegistries []string
 
 		BeforeEach(func() {
 			server = ghttp.NewServer()
@@ -167,6 +168,8 @@ var _ = Describe("Builder helpers", func() {
 
 			repoName = ""
 			tag = "latest"
+
+			insecureRegistries = []string{}
 		})
 
 		Context("with an invalid host", func() {
@@ -176,7 +179,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(err).Should(HaveOccurred())
 			})
 		})
@@ -187,7 +190,7 @@ var _ = Describe("Builder helpers", func() {
 				repoName = registryHost + "/some_user/not_some_repo"
 			})
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(err).Should(HaveOccurred())
 			})
 		})
@@ -199,7 +202,7 @@ var _ = Describe("Builder helpers", func() {
 				tag = "not_some_tag"
 			})
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(err).Should(HaveOccurred())
 			})
 		})
@@ -222,12 +225,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(err).ShouldNot(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(repoName, tag)
+				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(img).ShouldNot(BeNil())
 				Ω(img.Config).ShouldNot(BeNil())
 				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "-foobar", "bazbot"}))
@@ -253,12 +256,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(err).ShouldNot(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(repoName, tag)
+				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(img).ShouldNot(BeNil())
 				Ω(img.Config).ShouldNot(BeNil())
 				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "arg1", "arg2"}))

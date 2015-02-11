@@ -21,6 +21,7 @@ var _ = Describe("Building", func() {
 		builderCmd                 *exec.Cmd
 		dockerRef                  string
 		dockerImageURL             string
+		dockerRegistryURL          string
 		outputMetadataDir          string
 		outputMetadataJSONFilename string
 		server                     *ghttp.Server
@@ -75,6 +76,7 @@ var _ = Describe("Building", func() {
 
 		dockerRef = ""
 		dockerImageURL = ""
+		dockerRegistryURL = ""
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
 		Ω(err).ShouldNot(HaveOccurred())
@@ -91,11 +93,15 @@ var _ = Describe("Building", func() {
 	})
 
 	JustBeforeEach(func() {
-		builderCmd = exec.Command(builderPath,
-			"-dockerImageUrl", dockerImageURL,
+		args := []string{"-dockerImageURL", dockerImageURL,
 			"-dockerRef", dockerRef,
-			"-outputMetadataJSONFilename", outputMetadataJSONFilename,
-		)
+			"-outputMetadataJSONFilename", outputMetadataJSONFilename}
+
+		if len(dockerRegistryURL) > 0 {
+			args = append(args, "-dockerRegistryURL", dockerRegistryURL)
+		}
+
+		builderCmd = exec.Command(builderPath, args...)
 
 		builderCmd.Env = os.Environ()
 	})
@@ -111,12 +117,23 @@ var _ = Describe("Building", func() {
 		Context("with no docker image arg specified", func() {
 			It("should exit with an error", func() {
 				session := builder()
-				Eventually(session.Err).Should(gbytes.Say("missing flag: dockerImageUrl or dockerRef required"))
+				Eventually(session.Err).Should(gbytes.Say("missing flag: dockerImageURL or dockerRef required"))
 				Eventually(session).Should(gexec.Exit(1))
 			})
 		})
 
 		Context("with an invalid output path", func() {
+			It("should exit with an error", func() {
+				session := builder()
+				Eventually(session).Should(gexec.Exit(1))
+			})
+		})
+
+		Context("with an invalid docker registry URL", func() {
+			BeforeEach(func() {
+				dockerRegistryURL = "://noscheme"
+			})
+
 			It("should exit with an error", func() {
 				session := builder()
 				Eventually(session).Should(gexec.Exit(1))
@@ -156,22 +173,35 @@ var _ = Describe("Building", func() {
 			})
 		}
 
-		Context("with a valid docker url", func() {
+		dockerURLFunc := func() {
 			BeforeEach(func() {
 				parts, _ := url.Parse(server.URL())
 				dockerImageURL = fmt.Sprintf("docker://%s/some-repo", parts.Host)
 			})
 
 			testValid()
-		})
+		}
 
-		Context("with a valid docker ref", func() {
+		dockerRefFunc := func() {
 			BeforeEach(func() {
 				parts, _ := url.Parse(server.URL())
 				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
 			})
 
 			testValid()
+		}
+
+		Context("with a valid docker registry URL", func() {
+			BeforeEach(func() {
+				dockerRegistryURL = server.URL()
+			})
+			Context("with a valid docker url", dockerURLFunc)
+			Context("with a valid docker ref", dockerRefFunc)
+		})
+
+		Context("without docker registry URL", func() {
+			Context("with a valid docker url", dockerURLFunc)
+			Context("with a valid docker ref", dockerRefFunc)
 		})
 	})
 })

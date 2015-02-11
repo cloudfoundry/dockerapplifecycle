@@ -12,8 +12,8 @@ import (
 func main() {
 	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
 
-	dockerImageUrl := flagSet.String(
-		"dockerImageUrl",
+	dockerImageURL := flagSet.String(
+		"dockerImageURL",
 		"",
 		"docker image uri in docker://[registry/][scope/]repository[#tag] format",
 	)
@@ -22,6 +22,12 @@ func main() {
 		"dockerRef",
 		"",
 		"docker image reference in standard docker string format",
+	)
+
+	dockerRegistryURL := flagSet.String(
+		"dockerRegistryURL",
+		"",
+		"Private Docker Registry URL",
 	)
 
 	outputFilename := flagSet.String(
@@ -37,10 +43,10 @@ func main() {
 
 	var repoName string
 	var tag string
-	if len(*dockerImageUrl) > 0 {
-		parts, err := url.Parse(*dockerImageUrl)
+	if len(*dockerImageURL) > 0 {
+		parts, err := url.Parse(*dockerImageURL)
 		if err != nil {
-			println("invalid dockerImageUrl: " + *dockerImageUrl)
+			println("invalid dockerImageURL: " + *dockerImageURL)
 			flagSet.PrintDefaults()
 			os.Exit(1)
 		}
@@ -48,12 +54,26 @@ func main() {
 	} else if len(*dockerRef) > 0 {
 		repoName, tag = helpers.ParseDockerRef(*dockerRef)
 	} else {
-		println("missing flag: dockerImageUrl or dockerRef required")
+		println("missing flag: dockerImageURL or dockerRef required")
 		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 
-	img, err := helpers.FetchMetadata(repoName, tag)
+	var insecureRegistries []string
+	if len(*dockerRegistryURL) > 0 {
+		parts, err := url.Parse(*dockerRegistryURL)
+		if err != nil {
+			println("invalid dockerRegistryURL: " + *dockerRegistryURL)
+			flagSet.PrintDefaults()
+			os.Exit(1)
+		}
+
+		if parts.Scheme == "http" {
+			insecureRegistries = []string{*dockerRegistryURL}
+		}
+	}
+
+	img, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)

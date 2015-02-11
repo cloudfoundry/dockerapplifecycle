@@ -46,13 +46,13 @@ func ParseDockerRef(dockerRef string) (string, string) {
 	return repoName, tag
 }
 
-func FetchMetadata(repoName string, tag string) (*image.Image, error) {
+func FetchMetadata(repoName string, tag string, insecureRegistries []string) (*image.Image, error) {
 	hostname, repoName, err := registry.ResolveRepositoryName(repoName)
 	if err != nil {
 		return nil, err
 	}
 
-	endpoint, err := registry.NewEndpoint(hostname, []string{"127.0.0.1/32"})
+	endpoint, err := registry.NewEndpoint(hostname, insecureRegistries)
 	if err != nil {
 		return nil, err
 	}
