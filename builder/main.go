@@ -1,13 +1,20 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 )
+
+type registries []string
+
+var insecureDockerRegistries registries
 
 func main() {
 	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
@@ -24,10 +31,10 @@ func main() {
 		"docker image reference in standard docker string format",
 	)
 
-	dockerRegistryURL := flagSet.String(
-		"dockerRegistryURL",
-		"",
-		"Private Docker Registry URL",
+	flagSet.Var(
+		&insecureDockerRegistries,
+		"insecureDockerRegistries",
+		"Insecure Docker Registry addresses (ip:port)",
 	)
 
 	outputFilename := flagSet.String(
@@ -59,21 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var insecureRegistries []string
-	if len(*dockerRegistryURL) > 0 {
-		parts, err := url.Parse(*dockerRegistryURL)
-		if err != nil {
-			println("invalid dockerRegistryURL: " + *dockerRegistryURL)
-			flagSet.PrintDefaults()
-			os.Exit(1)
-		}
-
-		if parts.Scheme == "http" {
-			insecureRegistries = []string{*dockerRegistryURL}
-		}
-	}
-
-	img, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+	img, err := helpers.FetchMetadata(repoName, tag, insecureDockerRegistries)
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)
@@ -90,4 +83,25 @@ func main() {
 		println(err.Error())
 		os.Exit(1)
 	}
+}
+
+func (r *registries) String() string {
+	return fmt.Sprint(*r)
+}
+
+func (r *registries) Set(value string) error {
+	if len(*r) > 0 {
+		return errors.New("Docker Registries flag already set")
+	}
+	for _, reg := range strings.Split(value, ",") {
+		registry := strings.TrimSpace(reg)
+		if strings.Contains(registry, "://") {
+			return errors.New("no scheme allowed for insecure Docker Registry [" + registry + "]")
+		}
+		if !strings.Contains(registry, ":") {
+			return errors.New("ip:port expected for insecure Docker Registry [" + registry + "]")
+		}
+		*r = append(*r, registry)
+	}
+	return nil
 }

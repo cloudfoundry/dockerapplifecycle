@@ -21,7 +21,7 @@ var _ = Describe("Building", func() {
 		builderCmd                 *exec.Cmd
 		dockerRef                  string
 		dockerImageURL             string
-		dockerRegistryURL          string
+		insecureDockerRegistries   string
 		outputMetadataDir          string
 		outputMetadataJSONFilename string
 		server                     *ghttp.Server
@@ -76,7 +76,7 @@ var _ = Describe("Building", func() {
 
 		dockerRef = ""
 		dockerImageURL = ""
-		dockerRegistryURL = ""
+		insecureDockerRegistries = ""
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
 		Ω(err).ShouldNot(HaveOccurred())
@@ -97,8 +97,8 @@ var _ = Describe("Building", func() {
 			"-dockerRef", dockerRef,
 			"-outputMetadataJSONFilename", outputMetadataJSONFilename}
 
-		if len(dockerRegistryURL) > 0 {
-			args = append(args, "-dockerRegistryURL", dockerRegistryURL)
+		if len(insecureDockerRegistries) > 0 {
+			args = append(args, "-insecureDockerRegistries", insecureDockerRegistries)
 		}
 
 		builderCmd = exec.Command(builderPath, args...)
@@ -129,15 +129,35 @@ var _ = Describe("Building", func() {
 			})
 		})
 
-		Context("with an invalid docker registry URL", func() {
-			BeforeEach(func() {
-				dockerRegistryURL = "://noscheme"
+		Context("with an invalid docker registry addesses", func() {
+			var invalidRegistryAddress string
+
+			Context("when an address has a scheme", func() {
+				BeforeEach(func() {
+					invalidRegistryAddress = "://10.244.2.6:5050"
+					insecureDockerRegistries = "10.244.2.7:8080, " + invalidRegistryAddress
+				})
+
+				It("should exit with an error", func() {
+					session := builder()
+					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: no scheme allowed for insecure Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
+					Eventually(session).Should(gexec.Exit(2))
+				})
 			})
 
-			It("should exit with an error", func() {
-				session := builder()
-				Eventually(session).Should(gexec.Exit(1))
+			Context("when an address has no port", func() {
+				BeforeEach(func() {
+					invalidRegistryAddress = "10.244.2.6"
+					insecureDockerRegistries = invalidRegistryAddress + " , 10.244.2.7:8080"
+				})
+
+				It("should exit with an error", func() {
+					session := builder()
+					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: ip:port expected for insecure Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
+					Eventually(session).Should(gexec.Exit(2))
+				})
 			})
+
 		})
 
 		testValid := func() {
@@ -175,7 +195,8 @@ var _ = Describe("Building", func() {
 
 		dockerURLFunc := func() {
 			BeforeEach(func() {
-				parts, _ := url.Parse(server.URL())
+				parts, err := url.Parse(server.URL())
+				Ω(err).ShouldNot(HaveOccurred())
 				dockerImageURL = fmt.Sprintf("docker://%s/some-repo", parts.Host)
 			})
 
@@ -184,22 +205,26 @@ var _ = Describe("Building", func() {
 
 		dockerRefFunc := func() {
 			BeforeEach(func() {
-				parts, _ := url.Parse(server.URL())
+				parts, err := url.Parse(server.URL())
+				Ω(err).ShouldNot(HaveOccurred())
 				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
 			})
 
 			testValid()
 		}
 
-		Context("with a valid docker registry URL", func() {
+		Context("with a valid insecure docker registries", func() {
 			BeforeEach(func() {
-				dockerRegistryURL = server.URL()
+				parts, err := url.Parse(server.URL())
+				Ω(err).ShouldNot(HaveOccurred())
+				insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
 			})
+
 			Context("with a valid docker url", dockerURLFunc)
 			Context("with a valid docker ref", dockerRefFunc)
 		})
 
-		Context("without docker registry URL", func() {
+		Context("without docker registries", func() {
 			Context("with a valid docker url", dockerURLFunc)
 			Context("with a valid docker ref", dockerRefFunc)
 		})
