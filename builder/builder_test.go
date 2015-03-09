@@ -3,7 +3,6 @@ package main_test
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -22,14 +21,13 @@ var _ = Describe("Building", func() {
 		dockerRef                  string
 		dockerImageURL             string
 		insecureDockerRegistries   string
+		dockerDaemonExecutablePath string
 		outputMetadataDir          string
 		outputMetadataJSONFilename string
-		server                     *ghttp.Server
-		endpoint1                  *ghttp.Server
-		endpoint2                  *ghttp.Server
+		fakeDockerRegistry         *ghttp.Server
 	)
 
-	builder := func() *gexec.Session {
+	setupBuilder := func() *gexec.Session {
 		session, err := gexec.Start(
 			builderCmd,
 			GinkgoWriter,
@@ -40,52 +38,20 @@ var _ = Describe("Building", func() {
 		return session
 	}
 
-	setupRegistry := func() {
-		server.AppendHandlers(
-			ghttp.VerifyRequest("GET", "/v1/_ping"),
-			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v1/repositories/some-repo/images"),
-				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Header().Set("X-Docker-Token", "token-1,token-2")
-					w.Header().Add("X-Docker-Endpoints", endpoint1.HTTPTestServer.Listener.Addr().String())
-					w.Header().Add("X-Docker-Endpoints", endpoint2.HTTPTestServer.Listener.Addr().String())
-					w.Write([]byte(`[
-                            {"id": "id-1", "checksum": "sha-1"},
-                            {"id": "id-2", "checksum": "sha-2"},
-                            {"id": "id-3", "checksum": "sha-3"}
-                        ]`))
-				}),
-			),
-		)
-
-		endpoint1.AppendHandlers(
-			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v1/repositories/library/some-repo/tags"),
-				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Write([]byte(`{
-                            "latest": "id-1",
-                            "some-other-tag": "id-2"
-                        }`))
-				}),
-			),
-		)
-	}
-
 	BeforeEach(func() {
 		var err error
 
 		dockerRef = ""
 		dockerImageURL = ""
 		insecureDockerRegistries = ""
+		dockerDaemonExecutablePath = "./docker"
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
 		Ω(err).ShouldNot(HaveOccurred())
 
 		outputMetadataJSONFilename = path.Join(outputMetadataDir, "result.json")
 
-		server = ghttp.NewServer()
-		endpoint1 = ghttp.NewServer()
-		endpoint2 = ghttp.NewServer()
+		fakeDockerRegistry = ghttp.NewServer()
 	})
 
 	AfterEach(func() {
@@ -95,6 +61,7 @@ var _ = Describe("Building", func() {
 	JustBeforeEach(func() {
 		args := []string{"-dockerImageURL", dockerImageURL,
 			"-dockerRef", dockerRef,
+			"-dockerDaemonExecutablePath", dockerDaemonExecutablePath,
 			"-outputMetadataJSONFilename", outputMetadataJSONFilename}
 
 		if len(insecureDockerRegistries) > 0 {
@@ -106,17 +73,10 @@ var _ = Describe("Building", func() {
 		builderCmd.Env = os.Environ()
 	})
 
-	resultJSON := func() []byte {
-		resultInfo, err := ioutil.ReadFile(outputMetadataJSONFilename)
-		Ω(err).ShouldNot(HaveOccurred())
-
-		return resultInfo
-	}
-
 	Context("when running the main", func() {
 		Context("with no docker image arg specified", func() {
 			It("should exit with an error", func() {
-				session := builder()
+				session := setupBuilder()
 				Eventually(session.Err).Should(gbytes.Say("missing flag: dockerImageURL or dockerRef required"))
 				Eventually(session).Should(gexec.Exit(1))
 			})
@@ -124,7 +84,7 @@ var _ = Describe("Building", func() {
 
 		Context("with an invalid output path", func() {
 			It("should exit with an error", func() {
-				session := builder()
+				session := setupBuilder()
 				Eventually(session).Should(gexec.Exit(1))
 			})
 		})
@@ -139,7 +99,7 @@ var _ = Describe("Building", func() {
 				})
 
 				It("should exit with an error", func() {
-					session := builder()
+					session := setupBuilder()
 					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: no scheme allowed for insecure Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
 					Eventually(session).Should(gexec.Exit(2))
 				})
@@ -152,81 +112,29 @@ var _ = Describe("Building", func() {
 				})
 
 				It("should exit with an error", func() {
-					session := builder()
+					session := setupBuilder()
 					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: ip:port expected for insecure Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
 					Eventually(session).Should(gexec.Exit(2))
 				})
 			})
 
-		})
+			Context("when docker daemon dir is invalid", func() {
+				BeforeEach(func() {
+					parts, err := url.Parse(fakeDockerRegistry.URL())
+					Ω(err).ShouldNot(HaveOccurred())
+					dockerImageURL = fmt.Sprintf("docker://%s/some-repo", parts.Host)
 
-		testValid := func() {
-			BeforeEach(func() {
-				setupRegistry()
-				endpoint1.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
-						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-							w.Header().Add("X-Docker-Size", "789")
-							w.Write([]byte(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`))
-						}),
-					),
-				)
-			})
+					dockerDaemonExecutablePath = "missing_dir/docker"
+				})
 
-			It("should exit successfully", func() {
-				session := builder()
-				Eventually(session).Should(gexec.Exit(0))
-			})
-
-			Describe("the json", func() {
-				It("should contain the execution metadata", func() {
-					session := builder()
-					Eventually(session).Should(gexec.Exit(0))
-
-					result := resultJSON()
-
-					Ω(result).Should(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
-					Ω(result).Should(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
-					Ω(result).Should(ContainSubstring(`\"workdir\":\"/workdir\"`))
+				It("should exit with an error", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("docker daemon not found in %s", dockerDaemonExecutablePath)))
+					Eventually(session).Should(gexec.Exit(1))
 				})
 			})
-		}
 
-		dockerURLFunc := func() {
-			BeforeEach(func() {
-				parts, err := url.Parse(server.URL())
-				Ω(err).ShouldNot(HaveOccurred())
-				dockerImageURL = fmt.Sprintf("docker://%s/some-repo", parts.Host)
-			})
-
-			testValid()
-		}
-
-		dockerRefFunc := func() {
-			BeforeEach(func() {
-				parts, err := url.Parse(server.URL())
-				Ω(err).ShouldNot(HaveOccurred())
-				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
-			})
-
-			testValid()
-		}
-
-		Context("with a valid insecure docker registries", func() {
-			BeforeEach(func() {
-				parts, err := url.Parse(server.URL())
-				Ω(err).ShouldNot(HaveOccurred())
-				insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
-			})
-
-			Context("with a valid docker url", dockerURLFunc)
-			Context("with a valid docker ref", dockerRefFunc)
 		})
 
-		Context("without docker registries", func() {
-			Context("with a valid docker url", dockerURLFunc)
-			Context("with a valid docker ref", dockerRefFunc)
-		})
 	})
 })

@@ -8,15 +8,18 @@ import (
 	"os"
 	"strings"
 
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
+
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 )
 
 type registries []string
 
-var insecureDockerRegistries registries
-
 func main() {
+	var insecureDockerRegistries registries
+
 	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
 
 	dockerImageURL := flagSet.String(
@@ -43,6 +46,12 @@ func main() {
 		"filename in which to write the app metadata",
 	)
 
+	dockerDaemonExecutablePath := flagSet.String(
+		"dockerDaemonExecutablePath",
+		"/tmp/docker_app_lifecycle/docker",
+		"path to the 'docker' executalbe",
+	)
+
 	if err := flagSet.Parse(os.Args[1:len(os.Args)]); err != nil {
 		println(err.Error())
 		os.Exit(1)
@@ -66,23 +75,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	img, err := helpers.FetchMetadata(repoName, tag, insecureDockerRegistries)
+	builder := Builder{
+		RepoName: repoName,
+		Tag:      tag,
+		InsecureDockerRegistries: insecureDockerRegistries,
+		OutputFilename:           *outputFilename,
+	}
+
+	if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
+		println("docker daemon not found in", *dockerDaemonExecutablePath)
+		os.Exit(1)
+	}
+
+	dockerDaemon := DockerDaemon{
+		DockerDaemonPath:         *dockerDaemonExecutablePath,
+		InsecureDockerRegistries: insecureDockerRegistries,
+	}
+
+	members := grouper.Members{
+		{"builder", ifrit.RunFunc(builder.Run)},
+		{"docker_daemon", ifrit.RunFunc(dockerDaemon.Run)},
+	}
+	group := grouper.NewParallel(os.Interrupt, members)
+	process := ifrit.Invoke(sigmon.New(group))
+
+	fmt.Println("Staging process started ...")
+
+	err := <-process.Wait()
 	if err != nil {
-		println(err.Error())
-		os.Exit(1)
+		println("Staging process failed:", err.Error())
+		os.Exit(2)
 	}
 
-	info := protocol.ExecutionMetadata{}
-	if img.Config != nil {
-		info.Cmd = img.Config.Cmd
-		info.Entrypoint = img.Config.Entrypoint
-		info.Workdir = img.Config.WorkingDir
-	}
-
-	if err := helpers.SaveMetadata(*outputFilename, &info); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	}
+	fmt.Println("Staging process finished")
 }
 
 func (r *registries) String() string {
