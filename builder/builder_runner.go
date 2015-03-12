@@ -80,11 +80,11 @@ func (builder *Builder) fetchMetadata() <-chan error {
 }
 
 func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
-	done := make(chan struct{})
-	defer close(done)
+	giveUp := make(chan struct{})
+	defer close(giveUp)
 
 	select {
-	case err := <-waitForDockerDaemon(done):
+	case err := <-waitForDockerDaemon(giveUp):
 		if err != nil {
 			return err
 		}
@@ -97,25 +97,24 @@ func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
 	return nil
 }
 
-func waitForDockerDaemon(done <-chan struct{}) <-chan error {
+func waitForDockerDaemon(giveUp <-chan struct{}) <-chan error {
 	errChan := make(chan error, 1)
 	client := http.Client{Transport: unix_transport.New("/var/run/docker.sock")}
 
-	go pingDaemonPeriodically(client, errChan, done)
+	go pingDaemonPeriodically(client, errChan, giveUp)
 
 	return errChan
 }
 
-func pingDaemonPeriodically(client http.Client, errChan chan<- error, done <-chan struct{}) {
+func pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
 	for {
 		resp, err := client.Get("unix:///var/run/docker.sock/_ping")
 		if err != nil {
 			println("Docker not ready yet. Ping returned ", err.Error())
 			select {
-			case <-done:
+			case <-giveUp:
 				return
 			case <-time.After(100 * time.Millisecond):
-				continue
 			}
 			continue
 		} else {
