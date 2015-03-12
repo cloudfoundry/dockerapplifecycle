@@ -27,7 +27,7 @@ func (daemon *DockerDaemon) Run(signals <-chan os.Signal, ready chan<- struct{})
 	case signal := <-signals:
 		err := daemonProcess.Signal(signal)
 		if err != nil {
-			println("failed to send signal %s to Docker daemon: %s", signal.String(), err.Error())
+			println("failed to send signal", signal.String(), "to Docker daemon:", err.Error())
 		}
 	}
 
@@ -43,6 +43,8 @@ func launchDockerDaemon(daemonPath string, insecureDockerRegistriesList []string
 	}
 
 	cmd := exec.Command(daemonPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	cmd.Env = os.Environ()
 
 	err := cmd.Start()
@@ -61,10 +63,11 @@ func launchDockerDaemon(daemonPath string, insecureDockerRegistriesList []string
 
 		err := cmd.Wait()
 		if err != nil {
-			chanError <- fmt.Errorf("Docker daemon failed %s", err)
+			chanError <- err
+			println("Docker daemon failed with", err.Error())
 		}
 
-		println("Docker daemon finished with ", err)
+		chanError <- nil
 	}()
 
 	return cmd.Process, chanError

@@ -3,10 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/unix_transport"
 )
 
 type Builder struct {
@@ -14,9 +17,14 @@ type Builder struct {
 	Tag                      string
 	InsecureDockerRegistries []string
 	OutputFilename           string
+	DockerDaemonTimeout      time.Duration
 }
 
 func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
+	err := waitForDocker(signals, builder.DockerDaemonTimeout)
+	if err != nil {
+		return err
+	}
 	close(ready)
 
 	select {
@@ -69,4 +77,58 @@ func (builder *Builder) fetchMetadata() <-chan error {
 	}()
 
 	return errorChan
+}
+
+func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
+	done := make(chan struct{})
+	defer close(done)
+
+	select {
+	case err := <-waitForDockerDaemon(done):
+		if err != nil {
+			return err
+		}
+	case <-time.After(timeout):
+		return errors.New("Timed out waiting for docker daemon to start")
+	case signal := <-signals:
+		return errors.New(signal.String())
+	}
+
+	return nil
+}
+
+func waitForDockerDaemon(done <-chan struct{}) <-chan error {
+	errChan := make(chan error, 1)
+	client := http.Client{Transport: unix_transport.New("/var/run/docker.sock")}
+
+	go pingDaemonPeriodically(client, errChan, done)
+
+	return errChan
+}
+
+func pingDaemonPeriodically(client http.Client, errChan chan<- error, done <-chan struct{}) {
+	for {
+		resp, err := client.Get("unix:///var/run/docker.sock/_ping")
+		if err != nil {
+			println("Docker not ready yet. Ping returned ", err.Error())
+			select {
+			case <-done:
+				return
+			case <-time.After(100 * time.Millisecond):
+				continue
+			}
+			continue
+		} else {
+			if resp.StatusCode == http.StatusOK {
+				fmt.Println("Docker daemon running")
+			} else {
+				errChan <- fmt.Errorf("Docker daemon failed to start. Ping returned %s", resp.Status)
+				return
+			}
+			break
+		}
+
+	}
+	errChan <- nil
+	return
 }

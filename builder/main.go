@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
@@ -80,6 +81,7 @@ func main() {
 		Tag:      tag,
 		InsecureDockerRegistries: insecureDockerRegistries,
 		OutputFilename:           *outputFilename,
+		DockerDaemonTimeout:      10 * time.Second,
 	}
 
 	if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
