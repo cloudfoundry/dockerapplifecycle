@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var DockerArgs []string = []string{"--daemon=true", "--iptables=false", "--ipv6=false", `--log-level="debug"`}
+var DockerArgs []string = []string{"--daemon=true", "--iptables=false", "--ipv6=false", `--log-level="error"`}
 
 type DockerDaemon struct {
 	DockerDaemonPath         string

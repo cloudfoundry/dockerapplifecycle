@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
@@ -13,17 +14,21 @@ import (
 )
 
 type Builder struct {
-	RepoName                 string
-	Tag                      string
-	InsecureDockerRegistries []string
-	OutputFilename           string
-	DockerDaemonTimeout      time.Duration
+	RepoName                   string
+	Tag                        string
+	InsecureDockerRegistries   []string
+	OutputFilename             string
+	DockerDaemonExecutablePath string
+	DockerDaemonTimeout        time.Duration
+	CacheDockerImage           bool
 }
 
 func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
-	err := waitForDocker(signals, builder.DockerDaemonTimeout)
-	if err != nil {
-		return err
+	if builder.CacheDockerImage {
+		err := waitForDocker(signals, builder.DockerDaemonTimeout)
+		if err != nil {
+			return err
+		}
 	}
 	close(ready)
 
@@ -73,10 +78,51 @@ func (builder *Builder) fetchMetadata() <-chan error {
 			return
 		}
 
+		if !builder.CacheDockerImage {
+			return
+		}
+
+		fmt.Println("Starting docker image caching ...")
+
+		dockerImageURL := builder.RepoName
+		if len(builder.Tag) > 0 {
+			dockerImageURL = dockerImageURL + ":" + builder.Tag
+		}
+
+		fmt.Sprintf("Pulling docker image %s\n", dockerImageURL)
+		err = builder.RunDockerCommand("pull", dockerImageURL)
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
+		fmt.Sprintf("Tagging docker image %s as %s\n", dockerImageURL, "10.244.2.6:8080/newtag")
+		err = builder.RunDockerCommand("tag", dockerImageURL, "10.244.2.6:8080/newtag")
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
+		fmt.Sprintf("Pushing docker image %s\n", "10.244.2.6:8080/newtag")
+		err = builder.RunDockerCommand("push", "10.244.2.6:8080/newtag")
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
+		fmt.Println("Docker image caching completed.")
 		errorChan <- nil
 	}()
 
 	return errorChan
+}
+
+func (builder *Builder) RunDockerCommand(args ...string) error {
+	cmd := exec.Command(builder.DockerDaemonExecutablePath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	return cmd.Run()
 }
 
 func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
@@ -110,7 +156,6 @@ func pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-c
 	for {
 		resp, err := client.Get("unix:///var/run/docker.sock/_ping")
 		if err != nil {
-			println("Docker not ready yet. Ping returned ", err.Error())
 			select {
 			case <-giveUp:
 				return

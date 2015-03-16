@@ -35,11 +35,12 @@ func (roundTripper UnixRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	socketClientConn := httputil.NewClientConn(conn, nil)
 	defer socketClientConn.Close()
 
-	req, err = roundTripper.rewriteRequest(req)
+	newReq, err := roundTripper.rewriteRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	return socketClientConn.Do(req)
+
+	return socketClientConn.Do(newReq)
 }
 
 func (roundTripper *UnixRoundTripper) rewriteRequest(req *http.Request) (*http.Request, error) {
@@ -52,11 +53,13 @@ func (roundTripper *UnixRoundTripper) rewriteRequest(req *http.Request) (*http.R
 	newReqUrl := fmt.Sprintf("unix://%s", reqPath)
 
 	var err error
-	req.URL, err = url.Parse(newReqUrl)
+	newURL, err := url.Parse(newReqUrl)
 	if err != nil {
 		return nil, err
 	}
-	req.RequestURI = newReqUrl
+
+	req.URL.Path = newURL.Path
+	req.URL.Host = roundTripper.path
 	return req, nil
 
 }

@@ -14,38 +14,41 @@ import (
 )
 
 var _ = Describe("Builder runner", func() {
+	var (
+		lifecycle        ifrit.Process
+		fakeDeamonRunner func(signals <-chan os.Signal, ready chan<- struct{}) error
+	)
+
+	BeforeEach(func() {
+		builder := main.Builder{
+			RepoName:            "ubuntu",
+			Tag:                 "latest",
+			OutputFilename:      "/tmp/result/result.json",
+			DockerDaemonTimeout: 300 * time.Millisecond,
+			CacheDockerImage:    true,
+		}
+
+		lifecycle = ifrit.Background(grouper.NewParallel(os.Interrupt, grouper.Members{
+			{"builder", ifrit.RunFunc(builder.Run)},
+			{"fake_docker_daemon", ifrit.RunFunc(fakeDeamonRunner)},
+		}))
+	})
+
+	AfterEach(func() {
+		helpers.StopProcesses(lifecycle)
+	})
 
 	Context("when the daemon won't start", func() {
-		var lifecycle ifrit.Process
-
-		fakeDeamonRunner := func(signals <-chan os.Signal, ready chan<- struct{}) error {
+		fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
 			close(ready)
 			select {
 			case signal := <-signals:
 				return errors.New(signal.String())
 			case <-time.After(1 * time.Second):
+				// Daemon "crashes" after a while
 			}
 			return nil
 		}
-
-		BeforeEach(func() {
-			builder := main.Builder{
-				RepoName:            "ubuntu",
-				Tag:                 "latest",
-				OutputFilename:      "/tmp/result/result.json",
-				DockerDaemonTimeout: 300 * time.Millisecond,
-			}
-
-			lifecycle = ifrit.Background(grouper.NewParallel(os.Kill, grouper.Members{
-				{"builder", ifrit.RunFunc(builder.Run)},
-				{"fake_docker_daemon", ifrit.RunFunc(fakeDeamonRunner)},
-			}))
-
-		})
-
-		AfterEach(func() {
-			helpers.StopProcesses(lifecycle)
-		})
 
 		It("times out", func() {
 			err := <-lifecycle.Wait()
@@ -62,7 +65,9 @@ var _ = Describe("Builder runner", func() {
 				err := <-lifecycle.Wait()
 				Ω(err).Should(HaveOccurred())
 				Ω(err.Error()).Should(ContainSubstring("fake_docker_daemon exited with error: interrupt"))
+				Ω(err.Error()).Should(ContainSubstring("builder exited with error: interrupt"))
 			})
 		})
+
 	})
 })

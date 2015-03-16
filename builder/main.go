@@ -35,22 +35,28 @@ func main() {
 		"docker image reference in standard docker string format",
 	)
 
-	flagSet.Var(
-		&insecureDockerRegistries,
-		"insecureDockerRegistries",
-		"Insecure Docker Registry addresses (ip:port)",
-	)
-
 	outputFilename := flagSet.String(
 		"outputMetadataJSONFilename",
 		"/tmp/result/result.json",
 		"filename in which to write the app metadata",
 	)
 
+	flagSet.Var(
+		&insecureDockerRegistries,
+		"insecureDockerRegistries",
+		"Insecure Docker Registry addresses (ip:port)",
+	)
+
 	dockerDaemonExecutablePath := flagSet.String(
 		"dockerDaemonExecutablePath",
 		"/tmp/docker_app_lifecycle/docker",
 		"path to the 'docker' executalbe",
+	)
+
+	cacheDockerImage := flagSet.Bool(
+		"cacheDockerImage",
+		false,
+		"Caches Docker images to private docker registry",
 	)
 
 	if err := flagSet.Parse(os.Args[1:len(os.Args)]); err != nil {
@@ -79,25 +85,30 @@ func main() {
 	builder := Builder{
 		RepoName: repoName,
 		Tag:      tag,
-		InsecureDockerRegistries: insecureDockerRegistries,
-		OutputFilename:           *outputFilename,
-		DockerDaemonTimeout:      10 * time.Second,
-	}
-
-	if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
-		println("docker daemon not found in", *dockerDaemonExecutablePath)
-		os.Exit(1)
-	}
-
-	dockerDaemon := DockerDaemon{
-		DockerDaemonPath:         *dockerDaemonExecutablePath,
-		InsecureDockerRegistries: insecureDockerRegistries,
+		InsecureDockerRegistries:   insecureDockerRegistries,
+		OutputFilename:             *outputFilename,
+		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
+		DockerDaemonTimeout:        10 * time.Second,
+		CacheDockerImage:           *cacheDockerImage,
 	}
 
 	members := grouper.Members{
 		{"builder", ifrit.RunFunc(builder.Run)},
-		{"docker_daemon", ifrit.RunFunc(dockerDaemon.Run)},
 	}
+
+	if *cacheDockerImage {
+		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
+			println("docker daemon not found in", *dockerDaemonExecutablePath)
+			os.Exit(1)
+		}
+
+		dockerDaemon := DockerDaemon{
+			DockerDaemonPath:         *dockerDaemonExecutablePath,
+			InsecureDockerRegistries: insecureDockerRegistries,
+		}
+		members = append(members, grouper.Member{"docker_daemon", ifrit.RunFunc(dockerDaemon.Run)})
+	}
+
 	group := grouper.NewParallel(os.Interrupt, members)
 	process := ifrit.Invoke(sigmon.New(group))
 

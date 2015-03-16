@@ -94,12 +94,12 @@ var _ = Describe("Unix transport", func() {
 			}
 
 			BeforeEach(func() {
-				validateHeaders := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					asserHeaderContains(req.Header, "Content-Type", "application/json")
-				})
-
 				validateBody := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					assertBodyEquals(req.Body, ReqBody)
+				})
+
+				validateQueryParams := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					Ω(req.URL.RawQuery).Should(Equal("fromImage=ubunut&tag=latest"))
 				})
 
 				handleRequest := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -110,13 +110,14 @@ var _ = Describe("Unix transport", func() {
 				unixSocketServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("POST", "/containers/create"),
-						validateHeaders,
+						ghttp.VerifyContentType("application/json"),
 						validateBody,
+						validateQueryParams,
 						handleRequest,
 					),
 				)
 				body := strings.NewReader(ReqBody)
-				req, err := http.NewRequest("POST", "unix://"+socket+"/containers/create", body)
+				req, err := http.NewRequest("POST", "unix://"+socket+"/containers/create?fromImage=ubunut&tag=latest", body)
 				req.Header.Add("Content-Type", "application/json")
 				Ω(err).ShouldNot(HaveOccurred())
 
