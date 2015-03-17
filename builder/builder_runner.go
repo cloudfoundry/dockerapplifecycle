@@ -11,11 +11,13 @@ import (
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/unix_transport"
+	"github.com/nu7hatch/gouuid"
 )
 
 type Builder struct {
 	RepoName                   string
 	Tag                        string
+	DockerRegistryAddresses    []string
 	InsecureDockerRegistries   []string
 	OutputFilename             string
 	DockerDaemonExecutablePath string
@@ -82,33 +84,48 @@ func (builder *Builder) fetchMetadata() <-chan error {
 			return
 		}
 
-		fmt.Println("Starting docker image caching ...")
+		fmt.Println("Caching docker image ...")
 
 		dockerImageURL := builder.RepoName
 		if len(builder.Tag) > 0 {
 			dockerImageURL = dockerImageURL + ":" + builder.Tag
 		}
 
-		fmt.Sprintf("Pulling docker image %s\n", dockerImageURL)
+		fmt.Printf("Pulling docker image %s ...\n", dockerImageURL)
 		err = builder.RunDockerCommand("pull", dockerImageURL)
 		if err != nil {
+			println("failed to pull image", err)
 			errorChan <- err
 			return
 		}
+		fmt.Println("Docker image pulled.")
 
-		fmt.Sprintf("Tagging docker image %s as %s\n", dockerImageURL, "10.244.2.6:8080/newtag")
-		err = builder.RunDockerCommand("tag", dockerImageURL, "10.244.2.6:8080/newtag")
+		uuid, err := uuid.NewV4()
 		if err != nil {
+			println("failed to generate random image name", err)
 			errorChan <- err
 			return
 		}
+		cachedImageName := fmt.Sprintf("%s/%s", builder.DockerRegistryAddresses[0], uuid)
+		fmt.Printf("Docker image will be cached as %s\n", cachedImageName)
 
-		fmt.Sprintf("Pushing docker image %s\n", "10.244.2.6:8080/newtag")
-		err = builder.RunDockerCommand("push", "10.244.2.6:8080/newtag")
+		fmt.Printf("Tagging docker image %s as %s ...\n", dockerImageURL, cachedImageName)
+		err = builder.RunDockerCommand("tag", dockerImageURL, cachedImageName)
 		if err != nil {
+			println("failed to tag image", err)
 			errorChan <- err
 			return
 		}
+		fmt.Println("Docker image tagged.")
+
+		fmt.Printf("Pushing docker image %s\n", cachedImageName)
+		err = builder.RunDockerCommand("push", cachedImageName)
+		if err != nil {
+			println("failed to push image", err)
+			errorChan <- err
+			return
+		}
+		fmt.Println("Docker image pushed.")
 
 		fmt.Println("Docker image caching completed.")
 		errorChan <- nil

@@ -20,6 +20,7 @@ type registries []string
 
 func main() {
 	var insecureDockerRegistries registries
+	var dockerRegistryAddresses registries
 
 	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
 
@@ -45,6 +46,12 @@ func main() {
 		&insecureDockerRegistries,
 		"insecureDockerRegistries",
 		"Insecure Docker Registry addresses (ip:port)",
+	)
+
+	flagSet.Var(
+		&dockerRegistryAddresses,
+		"dockerRegistryAddresses",
+		"Docker Registry addresses (ip:port)",
 	)
 
 	dockerDaemonExecutablePath := flagSet.String(
@@ -85,6 +92,7 @@ func main() {
 	builder := Builder{
 		RepoName: repoName,
 		Tag:      tag,
+		DockerRegistryAddresses:    dockerRegistryAddresses,
 		InsecureDockerRegistries:   insecureDockerRegistries,
 		OutputFilename:             *outputFilename,
 		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
@@ -134,10 +142,10 @@ func (r *registries) Set(value string) error {
 	for _, reg := range strings.Split(value, ",") {
 		registry := strings.TrimSpace(reg)
 		if strings.Contains(registry, "://") {
-			return errors.New("no scheme allowed for insecure Docker Registry [" + registry + "]")
+			return errors.New("no scheme allowed for Docker Registry [" + registry + "]")
 		}
 		if !strings.Contains(registry, ":") {
-			return errors.New("ip:port expected for insecure Docker Registry [" + registry + "]")
+			return errors.New("ip:port expected for Docker Registry [" + registry + "]")
 		}
 		*r = append(*r, registry)
 	}

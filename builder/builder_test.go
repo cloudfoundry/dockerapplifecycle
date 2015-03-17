@@ -23,6 +23,7 @@ var _ = Describe("Building", func() {
 		dockerRef                  string
 		dockerImageURL             string
 		insecureDockerRegistries   string
+		dockerRegistryAddresses    string
 		dockerDaemonExecutablePath string
 		cacheDockerImage           bool
 		outputMetadataDir          string
@@ -89,6 +90,7 @@ var _ = Describe("Building", func() {
 		dockerRef = ""
 		dockerImageURL = ""
 		insecureDockerRegistries = ""
+		dockerRegistryAddresses = ""
 		dockerDaemonExecutablePath = "./docker"
 		cacheDockerImage = false
 
@@ -116,6 +118,9 @@ var _ = Describe("Building", func() {
 		}
 		if len(insecureDockerRegistries) > 0 {
 			args = append(args, "-insecureDockerRegistries", insecureDockerRegistries)
+		}
+		if len(dockerRegistryAddresses) > 0 {
+			args = append(args, "-dockerRegistryAddresses", dockerRegistryAddresses)
 		}
 		if cacheDockerImage {
 			args = append(args, "-cacheDockerImage")
@@ -155,7 +160,7 @@ var _ = Describe("Building", func() {
 
 				It("should exit with an error", func() {
 					session := setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: no scheme allowed for insecure Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
+					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: no scheme allowed for Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
 					Eventually(session).Should(gexec.Exit(2))
 				})
 			})
@@ -170,7 +175,7 @@ var _ = Describe("Building", func() {
 
 				It("should exit with an error", func() {
 					session := setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: ip:port expected for insecure Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
+					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("invalid value \"%s\" for flag -insecureDockerRegistries: ip:port expected for Docker Registry \\[%s\\]", insecureDockerRegistries, invalidRegistryAddress)))
 					Eventually(session).Should(gexec.Exit(2))
 				})
 			})
@@ -245,6 +250,17 @@ var _ = Describe("Building", func() {
 					parts, err := url.Parse(fakeDockerRegistry.URL())
 					Ω(err).ShouldNot(HaveOccurred())
 					insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
+				})
+
+				Context("with a valid docker url", dockerURLFunc)
+				Context("with a valid docker ref", dockerRefFunc)
+			})
+
+			Context("with a valid docker registries", func() {
+				BeforeEach(func() {
+					parts, err := url.Parse(fakeDockerRegistry.URL())
+					Ω(err).ShouldNot(HaveOccurred())
+					dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
 				})
 
 				Context("with a valid docker url", dockerURLFunc)
