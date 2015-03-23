@@ -64,11 +64,26 @@ func (builder *Builder) fetchMetadata() <-chan error {
 			return
 		}
 
-		info := protocol.ExecutionMetadata{}
+		info := protocol.DockerImageMetadata{}
 		if img.Config != nil {
-			info.Cmd = img.Config.Cmd
-			info.Entrypoint = img.Config.Entrypoint
-			info.Workdir = img.Config.WorkingDir
+			info.ExecutionMetadata.Cmd = img.Config.Cmd
+			info.ExecutionMetadata.Entrypoint = img.Config.Entrypoint
+			info.ExecutionMetadata.Workdir = img.Config.WorkingDir
+		}
+
+		dockerImageURL := builder.RepoName
+		if len(builder.Tag) > 0 {
+			dockerImageURL = dockerImageURL + ":" + builder.Tag
+		}
+		info.DockerImage = dockerImageURL
+
+		if builder.CacheDockerImage {
+			info.DockerImage, err = builder.cacheDockerImage(dockerImageURL)
+			if err != nil {
+				println("failed to cache image", dockerImageURL, err.Error())
+				errorChan <- err
+				return
+			}
 		}
 
 		if err := helpers.SaveMetadata(builder.OutputFilename, &info); err != nil {
@@ -80,58 +95,45 @@ func (builder *Builder) fetchMetadata() <-chan error {
 			return
 		}
 
-		if !builder.CacheDockerImage {
-			return
-		}
-
-		fmt.Println("Caching docker image ...")
-
-		dockerImageURL := builder.RepoName
-		if len(builder.Tag) > 0 {
-			dockerImageURL = dockerImageURL + ":" + builder.Tag
-		}
-
-		fmt.Printf("Pulling docker image %s ...\n", dockerImageURL)
-		err = builder.RunDockerCommand("pull", dockerImageURL)
-		if err != nil {
-			println("failed to pull image", err)
-			errorChan <- err
-			return
-		}
-		fmt.Println("Docker image pulled.")
-
-		uuid, err := uuid.NewV4()
-		if err != nil {
-			println("failed to generate random image name", err)
-			errorChan <- err
-			return
-		}
-		cachedImageName := fmt.Sprintf("%s/%s", builder.DockerRegistryAddresses[0], uuid)
-		fmt.Printf("Docker image will be cached as %s\n", cachedImageName)
-
-		fmt.Printf("Tagging docker image %s as %s ...\n", dockerImageURL, cachedImageName)
-		err = builder.RunDockerCommand("tag", dockerImageURL, cachedImageName)
-		if err != nil {
-			println("failed to tag image", err)
-			errorChan <- err
-			return
-		}
-		fmt.Println("Docker image tagged.")
-
-		fmt.Printf("Pushing docker image %s\n", cachedImageName)
-		err = builder.RunDockerCommand("push", cachedImageName)
-		if err != nil {
-			println("failed to push image", err)
-			errorChan <- err
-			return
-		}
-		fmt.Println("Docker image pushed.")
-
-		fmt.Println("Docker image caching completed.")
 		errorChan <- nil
 	}()
 
 	return errorChan
+}
+
+func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
+	fmt.Println("Caching docker image ...")
+
+	fmt.Printf("Pulling docker image %s ...\n", dockerImage)
+	err := builder.RunDockerCommand("pull", dockerImage)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("Docker image pulled.")
+
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+	cachedDockerImage := fmt.Sprintf("%s/%s", builder.DockerRegistryAddresses[0], uuid)
+	fmt.Printf("Docker image will be cached as %s\n", cachedDockerImage)
+
+	fmt.Printf("Tagging docker image %s as %s ...\n", dockerImage, cachedDockerImage)
+	err = builder.RunDockerCommand("tag", dockerImage, cachedDockerImage)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("Docker image tagged.")
+
+	fmt.Printf("Pushing docker image %s\n", cachedDockerImage)
+	err = builder.RunDockerCommand("push", cachedDockerImage)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("Docker image pushed.")
+	fmt.Println("Docker image caching completed.")
+
+	return cachedDockerImage, nil
 }
 
 func (builder *Builder) RunDockerCommand(args ...string) error {

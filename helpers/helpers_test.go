@@ -270,14 +270,17 @@ var _ = Describe("Builder helpers", func() {
 	})
 
 	Context("SaveMetadata", func() {
-		var metadata protocol.ExecutionMetadata
+		var metadata protocol.DockerImageMetadata
 		var outputDir string
 
 		BeforeEach(func() {
-			metadata = protocol.ExecutionMetadata{
-				Cmd:        []string{"fake-arg1", "fake-arg2"},
-				Entrypoint: []string{"fake-cmd", "fake-arg0"},
-				Workdir:    "/fake-workdir",
+			metadata = protocol.DockerImageMetadata{
+				ExecutionMetadata: protocol.ExecutionMetadata{
+					Cmd:        []string{"fake-arg1", "fake-arg2"},
+					Entrypoint: []string{"fake-cmd", "fake-arg0"},
+					Workdir:    "/fake-workdir",
+				},
+				DockerImage: "cloudfoundry/diego-docker-app",
 			}
 		})
 
@@ -305,7 +308,6 @@ var _ = Describe("Builder helpers", func() {
 				Ω(err).ShouldNot(HaveOccurred())
 				_, err = os.Stat(filename)
 				Ω(err).ShouldNot(HaveOccurred())
-
 			})
 
 			Describe("the json", func() {
@@ -325,21 +327,23 @@ var _ = Describe("Builder helpers", func() {
 					err = json.Unmarshal([]byte(stagingResult.ExecutionMetadata), &executionMetadata)
 					Ω(err).ShouldNot(HaveOccurred())
 
-					Ω(executionMetadata.Cmd).Should(Equal(metadata.Cmd))
+					Ω(executionMetadata.Cmd).Should(Equal(metadata.ExecutionMetadata.Cmd))
 					Ω(executionMetadata.Entrypoint).Should(Equal(expectedEntryPoint))
-					Ω(executionMetadata.Workdir).Should(Equal(metadata.Workdir))
+					Ω(executionMetadata.Workdir).Should(Equal(metadata.ExecutionMetadata.Workdir))
 
 					Ω(stagingResult.DetectedStartCommand).Should(HaveLen(1))
 					Ω(stagingResult.DetectedStartCommand).Should(HaveKeyWithValue("web", expectedStartCmd))
+
+					Ω(stagingResult.DockerImage).Should(Equal(metadata.DockerImage))
 				}
 
 				It("should contain the metadata", func() {
-					verifyMetadata(metadata.Entrypoint, "fake-cmd fake-arg0 fake-arg1 fake-arg2")
+					verifyMetadata(metadata.ExecutionMetadata.Entrypoint, "fake-cmd fake-arg0 fake-arg1 fake-arg2")
 				})
 
 				Context("when the EntryPoint is empty", func() {
 					BeforeEach(func() {
-						metadata.Entrypoint = []string{}
+						metadata.ExecutionMetadata.Entrypoint = []string{}
 					})
 
 					It("contains all but the EntryPoint", func() {
@@ -349,11 +353,11 @@ var _ = Describe("Builder helpers", func() {
 
 				Context("when the EntryPoint is nil", func() {
 					BeforeEach(func() {
-						metadata.Entrypoint = nil
+						metadata.ExecutionMetadata.Entrypoint = nil
 					})
 
 					It("contains all but the EntryPoint", func() {
-						verifyMetadata(metadata.Entrypoint, "fake-arg1 fake-arg2")
+						verifyMetadata(metadata.ExecutionMetadata.Entrypoint, "fake-arg1 fake-arg2")
 					})
 				})
 			})

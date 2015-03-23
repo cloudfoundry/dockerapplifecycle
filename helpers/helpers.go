@@ -92,13 +92,13 @@ func FetchMetadata(repoName string, tag string, insecureRegistries []string) (*i
 	return nil, fmt.Errorf("all endpoints failed: %s", err)
 }
 
-func SaveMetadata(filename string, metadata *protocol.ExecutionMetadata) error {
+func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error {
 	err := os.MkdirAll(path.Dir(filename), 0755)
 	if err != nil {
 		return err
 	}
 
-	executionMetadataJSON, err := json.Marshal(metadata)
+	executionMetadataJSON, err := json.Marshal(metadata.ExecutionMetadata)
 	if err != nil {
 		return err
 	}
@@ -110,15 +110,16 @@ func SaveMetadata(filename string, metadata *protocol.ExecutionMetadata) error {
 
 	defer resultFile.Close()
 
-	startCommand := strings.Join(metadata.Cmd, " ")
-	if len(metadata.Entrypoint) > 0 {
-		startCommand = strings.Join([]string{strings.Join(metadata.Entrypoint, " "), startCommand}, " ")
+	startCommand := strings.Join(metadata.ExecutionMetadata.Cmd, " ")
+	if len(metadata.ExecutionMetadata.Entrypoint) > 0 {
+		startCommand = strings.Join([]string{strings.Join(metadata.ExecutionMetadata.Entrypoint, " "), startCommand}, " ")
 	}
 	err = json.NewEncoder(resultFile).Encode(docker_app_lifecycle.StagingDockerResult{
 		ExecutionMetadata: string(executionMetadataJSON),
 		DetectedStartCommand: map[string]string{
 			"web": startCommand,
 		},
+		DockerImage: metadata.DockerImage,
 	})
 	if err != nil {
 		return err

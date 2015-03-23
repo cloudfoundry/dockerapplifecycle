@@ -5,3 +5,8 @@ type ExecutionMetadata struct {
 	Entrypoint []string `json:"entrypoint,omitempty"`
 	Workdir    string   `json:"workdir,omitempty"`
 }
+
+type DockerImageMetadata struct {
+	ExecutionMetadata ExecutionMetadata
+	DockerImage       string
+}
