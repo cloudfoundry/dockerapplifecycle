@@ -164,14 +164,22 @@
 			"Rev": "e444e69cbd2e2e3e0749a2f3c717cec491552bbf"
 		},
 		{
+			"ImportPath": "github.com/nu7hatch/gouuid",
+			"Rev": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
+		},
+		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.1.0-33-g17ea479",
-			"Rev": "17ea479729ee427265ac1e913443018350946ddf"
+			"Comment": "v1.1.0-40-ge573630",
+			"Rev": "e57363034d6f4d61cd9ef0b6917f69ad03977914"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Comment": "v1.0-28-g8adf9e1",
-			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
+			"Comment": "v1.0-30-g982c859",
+			"Rev": "982c859aeeffd81ab8717403fb03c379b6c92b5f"
+		},
+		{
+			"ImportPath": "github.com/tedsuo/ifrit",
+			"Rev": "ad7bb71ba0b29ab7874fa986da34c1ea2cd252f2"
 		}
 	]
 }

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/builder"
-	"github.com/cloudfoundry-incubator/inigo/helpers"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"github.com/tedsuo/ifrit"
-	"github.com/tedsuo/ifrit/grouper"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
+	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit/ginkgomon"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit/grouper"
 )
 
 var _ = Describe("Builder runner", func() {
@@ -35,7 +35,7 @@ var _ = Describe("Builder runner", func() {
 	})
 
 	AfterEach(func() {
-		helpers.StopProcesses(lifecycle)
+		ginkgomon.Interrupt(lifecycle)
 	})
 
 	Context("when the daemon won't start", func() {

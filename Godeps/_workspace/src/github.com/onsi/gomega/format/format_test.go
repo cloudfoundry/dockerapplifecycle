@@ -2,14 +2,16 @@ package format_test
 
 import (
 	"fmt"
+	"strings"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/format"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/types"
-	"strings"
 )
 
-type StringAlias string //recursive struct
+//recursive struct
+
+type StringAlias string
 type ByteAlias []byte
 type IntAlias int
 

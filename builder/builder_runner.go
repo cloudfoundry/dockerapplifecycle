@@ -11,7 +11,7 @@ import (
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/unix_transport"
-	"github.com/nu7hatch/gouuid"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/nu7hatch/gouuid"
 )
 
 type Builder struct {

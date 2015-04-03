@@ -5,8 +5,8 @@ import (
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo/types"
 )
 
-type FakeReporter struct //FakeReporter is useful for testing purposes
-{
+//FakeReporter is useful for testing purposes
+type FakeReporter struct {
 	Config config.GinkgoConfigType
 
 	BeginSummary         *types.SuiteSummary
