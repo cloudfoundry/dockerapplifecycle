@@ -57,7 +57,7 @@ func main() {
 	dockerDaemonExecutablePath := flagSet.String(
 		"dockerDaemonExecutablePath",
 		"/tmp/docker_app_lifecycle/docker",
-		"path to the 'docker' executalbe",
+		"path to the 'docker' executable",
 	)
 
 	cacheDockerImage := flagSet.Bool(
