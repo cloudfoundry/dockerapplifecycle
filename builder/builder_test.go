@@ -268,10 +268,11 @@ var _ = Describe("Building", func() {
 			})
 
 			Context("without docker registries", func() {
-				Context("with a valid docker url", dockerURLFunc)
-				Context("with a valid docker ref", dockerRefFunc)
+				Context("when there is no caching requested", func() {
+					Context("with a valid docker url", dockerURLFunc)
+					Context("with a valid docker ref", dockerRefFunc)
+				})
 			})
-
 		})
 
 	})

@@ -112,11 +112,10 @@ func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
 	}
 	fmt.Println("Docker image pulled.")
 
-	uuid, err := uuid.NewV4()
+	cachedDockerImage, err := builder.GenerateImageName()
 	if err != nil {
 		return "", err
 	}
-	cachedDockerImage := fmt.Sprintf("%s/%s", getRegistryAddress(builder.DockerRegistryAddresses), uuid)
 	fmt.Printf("Docker image will be cached as %s\n", cachedDockerImage)
 
 	fmt.Printf("Tagging docker image %s as %s ...\n", dockerImage, cachedDockerImage)
@@ -143,6 +142,14 @@ func (builder *Builder) RunDockerCommand(args ...string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Env = os.Environ()
 	return cmd.Run()
+}
+
+func (builder *Builder) GenerateImageName() (string, error) {
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/%s", getRegistryAddress(builder.DockerRegistryAddresses), uuid), nil
 }
 
 func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
