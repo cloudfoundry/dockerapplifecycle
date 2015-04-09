@@ -3,15 +3,16 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"time"
 
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/nu7hatch/gouuid"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/unix_transport"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/nu7hatch/gouuid"
 )
 
 type Builder struct {
@@ -115,7 +116,7 @@ func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cachedDockerImage := fmt.Sprintf("%s/%s", builder.DockerRegistryAddresses[0], uuid)
+	cachedDockerImage := fmt.Sprintf("%s/%s", getRegistryAddress(builder.DockerRegistryAddresses), uuid)
 	fmt.Printf("Docker image will be cached as %s\n", cachedDockerImage)
 
 	fmt.Printf("Tagging docker image %s as %s ...\n", dockerImage, cachedDockerImage)
@@ -194,4 +195,9 @@ func pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-c
 	}
 	errChan <- nil
 	return
+}
+
+func getRegistryAddress(registryAddresses []string) string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return registryAddresses[r.Intn(len(registryAddresses))]
 }
