@@ -110,6 +110,11 @@ func main() {
 			os.Exit(1)
 		}
 
+		if len(dockerRegistryAddresses) == 0 {
+			println("missing flag: dockerRegistryAddresses required")
+			os.Exit(1)
+		}
+
 		dockerDaemon := DockerDaemon{
 			DockerDaemonPath:         *dockerDaemonExecutablePath,
 			InsecureDockerRegistries: insecureDockerRegistries,

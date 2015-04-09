@@ -91,7 +91,7 @@ var _ = Describe("Building", func() {
 		dockerImageURL = ""
 		insecureDockerRegistries = ""
 		dockerRegistryAddresses = ""
-		dockerDaemonExecutablePath = "./docker"
+		dockerDaemonExecutablePath = ""
 		cacheDockerImage = false
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
@@ -107,8 +107,7 @@ var _ = Describe("Building", func() {
 	})
 
 	JustBeforeEach(func() {
-		args := []string{"-dockerDaemonExecutablePath", dockerDaemonExecutablePath,
-			"-outputMetadataJSONFilename", outputMetadataJSONFilename}
+		args := []string{"-outputMetadataJSONFilename", outputMetadataJSONFilename}
 
 		if len(dockerImageURL) > 0 {
 			args = append(args, "-dockerImageURL", dockerImageURL)
@@ -124,6 +123,9 @@ var _ = Describe("Building", func() {
 		}
 		if cacheDockerImage {
 			args = append(args, "-cacheDockerImage")
+		}
+		if len(dockerDaemonExecutablePath) > 0 {
+			args = append(args, "-dockerDaemonExecutablePath", dockerDaemonExecutablePath)
 		}
 
 		builderCmd = exec.Command(builderPath, args...)
@@ -179,101 +181,116 @@ var _ = Describe("Building", func() {
 					Eventually(session).Should(gexec.Exit(2))
 				})
 			})
+		})
 
-			Context("when docker daemon dir is invalid", func() {
-				BeforeEach(func() {
-					cacheDockerImage = true
-					dockerImageURL = buildDockerImageURL()
-					dockerDaemonExecutablePath = "missing_dir/docker"
-				})
-
-				It("should exit with an error", func() {
-					session := setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("docker daemon not found in %s", dockerDaemonExecutablePath)))
-					Eventually(session).Should(gexec.Exit(1))
-				})
+		Context("when docker daemon dir is invalid", func() {
+			BeforeEach(func() {
+				cacheDockerImage = true
+				dockerImageURL = buildDockerImageURL()
+				dockerDaemonExecutablePath = "missing_dir/docker"
 			})
 
-			testValid := func() {
-				BeforeEach(func() {
-					setupFakeDockerRegistry()
-					fakeDockerRegistry.AppendHandlers(
-						ghttp.CombineHandlers(
-							ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
-							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-								w.Header().Add("X-Docker-Size", "789")
-								w.Write([]byte(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`))
-							}),
-						),
-					)
-				})
-
-				It("should exit successfully", func() {
-					session := setupBuilder()
-					Eventually(session, 10*time.Second).Should(gexec.Exit(0))
-				})
-
-				Describe("the json", func() {
-					It("should contain the execution metadata", func() {
-						session := setupBuilder()
-						Eventually(session, 10*time.Second).Should(gexec.Exit(0))
-
-						result := resultJSON()
-
-						Ω(result).Should(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
-						Ω(result).Should(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
-						Ω(result).Should(ContainSubstring(`\"workdir\":\"/workdir\"`))
-					})
-				})
-			}
-
-			dockerURLFunc := func() {
-				BeforeEach(func() {
-					dockerImageURL = buildDockerImageURL()
-				})
-
-				testValid()
-			}
-
-			dockerRefFunc := func() {
-				BeforeEach(func() {
-					parts, err := url.Parse(fakeDockerRegistry.URL())
-					Ω(err).ShouldNot(HaveOccurred())
-					dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
-				})
-
-				testValid()
-			}
-
-			Context("with a valid insecure docker registries", func() {
-				BeforeEach(func() {
-					parts, err := url.Parse(fakeDockerRegistry.URL())
-					Ω(err).ShouldNot(HaveOccurred())
-					insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
-				})
-
-				Context("with a valid docker url", dockerURLFunc)
-				Context("with a valid docker ref", dockerRefFunc)
-			})
-
-			Context("with a valid docker registries", func() {
-				BeforeEach(func() {
-					parts, err := url.Parse(fakeDockerRegistry.URL())
-					Ω(err).ShouldNot(HaveOccurred())
-					dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
-				})
-
-				Context("with a valid docker url", dockerURLFunc)
-				Context("with a valid docker ref", dockerRefFunc)
-			})
-
-			Context("without docker registries", func() {
-				Context("when there is no caching requested", func() {
-					Context("with a valid docker url", dockerURLFunc)
-					Context("with a valid docker ref", dockerRefFunc)
-				})
+			It("should exit with an error", func() {
+				session := setupBuilder()
+				Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("docker daemon not found in %s", dockerDaemonExecutablePath)))
+				Eventually(session).Should(gexec.Exit(1))
 			})
 		})
 
+		testValid := func() {
+			BeforeEach(func() {
+				setupFakeDockerRegistry()
+				fakeDockerRegistry.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+							w.Header().Add("X-Docker-Size", "789")
+							w.Write([]byte(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`))
+						}),
+					),
+				)
+			})
+
+			It("should exit successfully", func() {
+				session := setupBuilder()
+				Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+			})
+
+			Describe("the json", func() {
+				It("should contain the execution metadata", func() {
+					session := setupBuilder()
+					Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+
+					result := resultJSON()
+
+					Ω(result).Should(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
+					Ω(result).Should(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
+					Ω(result).Should(ContainSubstring(`\"workdir\":\"/workdir\"`))
+				})
+			})
+		}
+
+		dockerURLFunc := func() {
+			BeforeEach(func() {
+				dockerImageURL = buildDockerImageURL()
+			})
+
+			testValid()
+		}
+
+		dockerRefFunc := func() {
+			BeforeEach(func() {
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Ω(err).ShouldNot(HaveOccurred())
+				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
+			})
+
+			testValid()
+		}
+
+		Context("with a valid insecure docker registries", func() {
+			BeforeEach(func() {
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Ω(err).ShouldNot(HaveOccurred())
+				insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
+			})
+
+			Context("with a valid docker url", dockerURLFunc)
+			Context("with a valid docker ref", dockerRefFunc)
+		})
+
+		Context("with a valid docker registries", func() {
+			BeforeEach(func() {
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Ω(err).ShouldNot(HaveOccurred())
+				dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
+			})
+
+			Context("with a valid docker url", dockerURLFunc)
+			Context("with a valid docker ref", dockerRefFunc)
+		})
+
+		Context("without docker registries", func() {
+			Context("when there is no caching requested", func() {
+				Context("with a valid docker url", dockerURLFunc)
+				Context("with a valid docker ref", dockerRefFunc)
+			})
+
+			Context("when caching is requested", func() {
+				var session *gexec.Session
+
+				BeforeEach(func() {
+					dockerImageURL = buildDockerImageURL()
+					cacheDockerImage = true
+					dockerDaemonExecutablePath = "./builder"
+				})
+
+				It("should error", func() {
+					session = setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("missing flag: dockerRegistryAddresses required"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+		})
 	})
 })
