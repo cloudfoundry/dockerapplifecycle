@@ -105,13 +105,12 @@ func main() {
 	}
 
 	if *cacheDockerImage {
-		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
-			println("docker daemon not found in", *dockerDaemonExecutablePath)
-			os.Exit(1)
-		}
-
 		if len(dockerRegistryAddresses) == 0 {
 			println("missing flag: dockerRegistryAddresses required")
+			os.Exit(1)
+		}
+		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
+			println("docker daemon not found in", *dockerDaemonExecutablePath)
 			os.Exit(1)
 		}
 

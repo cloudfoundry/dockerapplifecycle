@@ -188,6 +188,10 @@ var _ = Describe("Building", func() {
 				cacheDockerImage = true
 				dockerImageURL = buildDockerImageURL()
 				dockerDaemonExecutablePath = "missing_dir/docker"
+
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Ω(err).ShouldNot(HaveOccurred())
+				dockerRegistryAddresses = parts.Host
 			})
 
 			It("should exit with an error", func() {
@@ -282,7 +286,6 @@ var _ = Describe("Building", func() {
 				BeforeEach(func() {
 					dockerImageURL = buildDockerImageURL()
 					cacheDockerImage = true
-					dockerDaemonExecutablePath = "./builder"
 				})
 
 				It("should error", func() {
