@@ -9,6 +9,7 @@ import (
 	"path"
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/nat"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
@@ -201,6 +202,7 @@ var _ = Describe("Builder helpers", func() {
 				repoName = registryHost + "/some_user/some_repo"
 				tag = "not_some_tag"
 			})
+
 			It("should error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(err).Should(HaveOccurred())
@@ -233,6 +235,7 @@ var _ = Describe("Builder helpers", func() {
 				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
 				Ω(img).ShouldNot(BeNil())
 				Ω(img.Config).ShouldNot(BeNil())
+				Ω(img.Config.Cmd).ShouldNot(BeNil())
 				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "-foobar", "bazbot"}))
 			})
 		})
@@ -267,6 +270,48 @@ var _ = Describe("Builder helpers", func() {
 				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "arg1", "arg2"}))
 			})
 		})
+
+		Context("when the image exposes custom ports", func() {
+			BeforeEach(func() {
+				setupRegistry()
+
+				repoName = registryHost + "/some_user/some_repo"
+
+				endpoint1.AppendHandlers(
+					ghttp.CombineHandlers(
+						// Docker Image config: https://github.com/docker/docker/blob/master/runconfig/fixtures/container_config_1_19.json
+						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+							w.Header().Add("X-Docker-Size", "789")
+							w.Write([]byte(`{"id": "layer-1",
+							                 "parent": "parent-1",
+															 "Config": {
+																 "Cmd": ["/dockerapp", "-foobar", "bazbot"],
+																 "ExposedPorts": {
+                                   "80/tcp": {},
+																	 "53/udp": {}
+                                  }
+															  }
+														  }`))
+						}),
+					),
+				)
+			})
+
+			It("should not error", func() {
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				Ω(err).ShouldNot(HaveOccurred())
+			})
+
+			It("should return the exposed ports", func() {
+				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				Ω(img.Config).ShouldNot(BeNil())
+
+				Ω(img.Config.ExposedPorts).Should(HaveKeyWithValue(nat.NewPort("udp", "53"), struct{}{}))
+				Ω(img.Config.ExposedPorts).Should(HaveKeyWithValue(nat.NewPort("tcp", "80"), struct{}{}))
+			})
+		})
+
 	})
 
 	Context("SaveMetadata", func() {
