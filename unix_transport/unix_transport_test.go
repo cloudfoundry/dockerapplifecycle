@@ -34,11 +34,11 @@ var _ = Describe("Unix transport", func() {
 
 		BeforeEach(func() {
 			uuid, err := uuid.NewV4()
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			socket = fmt.Sprintf("/tmp/%s.sock", uuid)
 			unixSocketListener, err = net.Listen("unix", socket)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			unixSocketServer = ghttp.NewUnstartedServer()
 
@@ -64,15 +64,15 @@ var _ = Describe("Unix transport", func() {
 			})
 
 			It("responds with correct status", func() {
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp.StatusCode).Should(Equal(http.StatusOK))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			})
 
 			It("responds with correct body", func() {
 				bytes, err := ioutil.ReadAll(resp.Body)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(string(bytes)).Should(Equal("true"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(bytes)).To(Equal("true"))
 			})
 		})
 
@@ -84,13 +84,13 @@ var _ = Describe("Unix transport", func() {
 
 			assertBodyEquals := func(body io.ReadCloser, expectedContent string) {
 				bytes, err := ioutil.ReadAll(body)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(string(bytes)).Should(Equal(expectedContent))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(bytes)).To(Equal(expectedContent))
 
 			}
 
 			asserHeaderContains := func(header http.Header, key, value string) {
-				Ω(header[key]).Should(ConsistOf(value))
+				Expect(header[key]).To(ConsistOf(value))
 			}
 
 			BeforeEach(func() {
@@ -99,7 +99,7 @@ var _ = Describe("Unix transport", func() {
 				})
 
 				validateQueryParams := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					Ω(req.URL.RawQuery).Should(Equal("fromImage=ubunut&tag=latest"))
+					Expect(req.URL.RawQuery).To(Equal("fromImage=ubunut&tag=latest"))
 				})
 
 				handleRequest := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -119,15 +119,15 @@ var _ = Describe("Unix transport", func() {
 				body := strings.NewReader(ReqBody)
 				req, err := http.NewRequest("POST", "unix://"+socket+"/containers/create?fromImage=ubunut&tag=latest", body)
 				req.Header.Add("Content-Type", "application/json")
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				resp, err = client.Do(req)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 			})
 
 			It("responds with correct status", func() {
-				Ω(resp.StatusCode).Should(Equal(http.StatusOK))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			})
 
 			It("responds with correct headers", func() {
@@ -143,8 +143,8 @@ var _ = Describe("Unix transport", func() {
 		Context("when socket in reques URI is incorrect", func() {
 			It("errors", func() {
 				resp, err = client.Get("unix:///fake/socket.sock/_ping")
-				Ω(err).Should(HaveOccurred())
-				Ω(err.Error()).Should(ContainSubstring("Wrong unix socket"))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("Wrong unix socket"))
 			})
 		})
 
@@ -161,8 +161,8 @@ var _ = Describe("Unix transport", func() {
 
 		It("errors", func() {
 			_, err := client.Get("unix:///not/existing.sock/_ping")
-			Ω(err).Should(HaveOccurred())
-			Ω(err.Error()).Should(ContainSubstring(fmt.Sprintf("dial unix %s: no such file or directory", socket)))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("dial unix %s: no such file or directory", socket)))
 		})
 	})
 })

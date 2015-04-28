@@ -53,8 +53,8 @@ var _ = Describe("Builder runner", func() {
 
 		It("times out", func() {
 			err := <-lifecycle.Wait()
-			Ω(err).Should(HaveOccurred())
-			Ω(err.Error()).Should(ContainSubstring("Timed out waiting for docker daemon to start"))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("Timed out waiting for docker daemon to start"))
 		})
 
 		Context("and the process is interrupted", func() {
@@ -64,9 +64,9 @@ var _ = Describe("Builder runner", func() {
 
 			It("exists with error", func() {
 				err := <-lifecycle.Wait()
-				Ω(err).Should(HaveOccurred())
-				Ω(err.Error()).Should(ContainSubstring("fake_docker_daemon exited with error: interrupt"))
-				Ω(err.Error()).Should(ContainSubstring("builder exited with error: interrupt"))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("fake_docker_daemon exited with error: interrupt"))
+				Expect(err.Error()).To(ContainSubstring("builder exited with error: interrupt"))
 			})
 		})
 	})
@@ -79,11 +79,11 @@ var _ = Describe("Builder runner", func() {
 
 		generateTag := func() (string, string) {
 			image, err := builder.GenerateImageName()
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			parts := strings.Split(image, "/")
-			Ω(parts).Should(HaveLen(2))
-			Ω(dockerRegistryAddresses).Should(ContainElement(parts[0]))
+			Expect(parts).To(HaveLen(2))
+			Expect(dockerRegistryAddresses).To(ContainElement(parts[0]))
 
 			return parts[0], parts[1]
 		}

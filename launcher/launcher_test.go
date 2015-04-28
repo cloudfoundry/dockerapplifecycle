@@ -27,7 +27,7 @@ var _ = Describe("Launcher", func() {
 
 		var err error
 		appDir, err = ioutil.TempDir("", "app-dir")
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		workdir = "/"
 
@@ -50,7 +50,7 @@ var _ = Describe("Launcher", func() {
 	JustBeforeEach(func() {
 		var err error
 		session, err = gexec.Start(launcherCmd, GinkgoWriter, GinkgoWriter)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	var ItExecutesTheCommandWithTheRightEnvironment = func() {
@@ -83,13 +83,13 @@ var _ = Describe("Launcher", func() {
 
 			vcapApplication := map[string]interface{}{}
 			err := json.Unmarshal(vcapApplicationBytes, &vcapApplication)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			Ω(vcapApplication["host"]).Should(Equal("0.0.0.0"))
-			Ω(vcapApplication["port"]).Should(Equal(float64(8080)))
-			Ω(vcapApplication["instance_index"]).Should(Equal(float64(123)))
-			Ω(vcapApplication["instance_id"]).Should(Equal("some-instance-guid"))
-			Ω(vcapApplication["foo"]).Should(Equal(float64(1)))
+			Expect(vcapApplication["host"]).To(Equal("0.0.0.0"))
+			Expect(vcapApplication["port"]).To(Equal(float64(8080)))
+			Expect(vcapApplication["instance_index"]).To(Equal(float64(123)))
+			Expect(vcapApplication["instance_id"]).To(Equal("some-instance-guid"))
+			Expect(vcapApplication["foo"]).To(Equal(float64(1)))
 		})
 	}
 

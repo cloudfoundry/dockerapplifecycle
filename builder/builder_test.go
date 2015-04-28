@@ -37,7 +37,7 @@ var _ = Describe("Building", func() {
 			GinkgoWriter,
 			GinkgoWriter,
 		)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		return session
 	}
@@ -73,13 +73,13 @@ var _ = Describe("Building", func() {
 
 	buildDockerImageURL := func() string {
 		parts, err := url.Parse(fakeDockerRegistry.URL())
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		return fmt.Sprintf("docker://%s/some-repo", parts.Host)
 	}
 
 	resultJSON := func() []byte {
 		resultInfo, err := ioutil.ReadFile(outputMetadataJSONFilename)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		return resultInfo
 	}
@@ -95,7 +95,7 @@ var _ = Describe("Building", func() {
 		cacheDockerImage = false
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		outputMetadataJSONFilename = path.Join(outputMetadataDir, "result.json")
 
@@ -190,7 +190,7 @@ var _ = Describe("Building", func() {
 				dockerDaemonExecutablePath = "missing_dir/docker"
 
 				parts, err := url.Parse(fakeDockerRegistry.URL())
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				dockerRegistryAddresses = parts.Host
 			})
 
@@ -227,9 +227,9 @@ var _ = Describe("Building", func() {
 
 					result := resultJSON()
 
-					Ω(result).Should(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
-					Ω(result).Should(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
-					Ω(result).Should(ContainSubstring(`\"workdir\":\"/workdir\"`))
+					Expect(result).To(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
+					Expect(result).To(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
+					Expect(result).To(ContainSubstring(`\"workdir\":\"/workdir\"`))
 				})
 			})
 		}
@@ -245,7 +245,7 @@ var _ = Describe("Building", func() {
 		dockerRefFunc := func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
 			})
 
@@ -255,7 +255,7 @@ var _ = Describe("Building", func() {
 		Context("with a valid insecure docker registries", func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
 			})
 
@@ -266,7 +266,7 @@ var _ = Describe("Building", func() {
 		Context("with a valid docker registries", func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
 			})
 

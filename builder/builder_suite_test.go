@@ -17,7 +17,7 @@ func TestDockerLifecycleBuilder(t *testing.T) {
 		var err error
 
 		builderPath, err = gexec.Build("github.com/cloudfoundry-incubator/docker_app_lifecycle/builder")
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterSuite(func() {

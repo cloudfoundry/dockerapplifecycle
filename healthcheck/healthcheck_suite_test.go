@@ -17,7 +17,7 @@ func TestDockerLifecycleHealthCheck(t *testing.T) {
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	healthcheckPath, err := gexec.Build("github.com/cloudfoundry-incubator/docker_app_lifecycle/healthcheck")
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	return []byte(healthcheckPath)
 }, func(healthcheckPath []byte) {
 	healthcheck = string(healthcheckPath)

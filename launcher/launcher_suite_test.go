@@ -17,7 +17,7 @@ func TestDockerLifecycleLauncher(t *testing.T) {
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	launcherPath, err := gexec.Build("github.com/cloudfoundry-incubator/docker_app_lifecycle/launcher", "-race")
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	return []byte(launcherPath)
 }, func(launcherPath []byte) {
 	launcher = string(launcherPath)

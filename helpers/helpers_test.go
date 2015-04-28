@@ -64,7 +64,7 @@ var _ = Describe("Builder helpers", func() {
 
 	resultJSON := func(filename string) []byte {
 		resultInfo, err := ioutil.ReadFile(filename)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		return resultInfo
 	}
@@ -73,83 +73,83 @@ var _ = Describe("Builder helpers", func() {
 		It("should return a repo and tag", func() {
 			parts, _ := url.Parse("docker://foobar:5123/baz/bot#test")
 			repoName, tag := helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
-			Ω(tag).Should(Equal("test"))
+			Expect(repoName).To(Equal("foobar:5123/baz/bot"))
+			Expect(tag).To(Equal("test"))
 
 			parts, _ = url.Parse("docker:///baz/bot#test")
 			repoName, tag = helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("baz/bot"))
-			Ω(tag).Should(Equal("test"))
+			Expect(repoName).To(Equal("baz/bot"))
+			Expect(tag).To(Equal("test"))
 
 			parts, _ = url.Parse("docker:///bot#test")
 			repoName, tag = helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("bot"))
-			Ω(tag).Should(Equal("test"))
+			Expect(repoName).To(Equal("bot"))
+			Expect(tag).To(Equal("test"))
 
 			parts, _ = url.Parse("docker:///xyz#123")
 			repoName, tag = helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("xyz"))
-			Ω(tag).Should(Equal("123"))
+			Expect(repoName).To(Equal("xyz"))
+			Expect(tag).To(Equal("123"))
 
 			parts, _ = url.Parse("docker:///a:123/b/c#456")
 			repoName, tag = helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("a:123/b/c"))
-			Ω(tag).Should(Equal("456"))
+			Expect(repoName).To(Equal("a:123/b/c"))
+			Expect(tag).To(Equal("456"))
 		})
 
 		It("should default to the latest tag", func() {
 			parts, _ := url.Parse("docker://a/b/c#latest")
 			repoName, tag := helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("a/b/c"))
-			Ω(tag).Should(Equal("latest"))
+			Expect(repoName).To(Equal("a/b/c"))
+			Expect(tag).To(Equal("latest"))
 
 			parts, _ = url.Parse("docker://foobar:5123/baz/bot")
 			repoName, tag = helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
-			Ω(tag).Should(Equal("latest"))
+			Expect(repoName).To(Equal("foobar:5123/baz/bot"))
+			Expect(tag).To(Equal("latest"))
 
 			parts, _ = url.Parse("docker:///baz/bot")
 			repoName, tag = helpers.ParseDockerURL(parts)
-			Ω(repoName).Should(Equal("baz/bot"))
-			Ω(tag).Should(Equal("latest"))
+			Expect(repoName).To(Equal("baz/bot"))
+			Expect(tag).To(Equal("latest"))
 		})
 	})
 
 	Describe("ParseDockerRef", func() {
 		It("should return a repo and tag", func() {
 			repoName, tag := helpers.ParseDockerRef("foobar:5123/baz/bot:test")
-			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
-			Ω(tag).Should(Equal("test"))
+			Expect(repoName).To(Equal("foobar:5123/baz/bot"))
+			Expect(tag).To(Equal("test"))
 
 			repoName, tag = helpers.ParseDockerRef("baz/bot:test")
-			Ω(repoName).Should(Equal("baz/bot"))
-			Ω(tag).Should(Equal("test"))
+			Expect(repoName).To(Equal("baz/bot"))
+			Expect(tag).To(Equal("test"))
 
 			repoName, tag = helpers.ParseDockerRef("bot:test")
-			Ω(repoName).Should(Equal("bot"))
-			Ω(tag).Should(Equal("test"))
+			Expect(repoName).To(Equal("bot"))
+			Expect(tag).To(Equal("test"))
 
 			repoName, tag = helpers.ParseDockerRef("xyz:123")
-			Ω(repoName).Should(Equal("xyz"))
-			Ω(tag).Should(Equal("123"))
+			Expect(repoName).To(Equal("xyz"))
+			Expect(tag).To(Equal("123"))
 
 			repoName, tag = helpers.ParseDockerRef("a:123/b/c:456")
-			Ω(repoName).Should(Equal("a:123/b/c"))
-			Ω(tag).Should(Equal("456"))
+			Expect(repoName).To(Equal("a:123/b/c"))
+			Expect(tag).To(Equal("456"))
 		})
 
 		It("should default to the latest tag", func() {
 			repoName, tag := helpers.ParseDockerRef("a/b/c")
-			Ω(repoName).Should(Equal("a/b/c"))
-			Ω(tag).Should(Equal("latest"))
+			Expect(repoName).To(Equal("a/b/c"))
+			Expect(tag).To(Equal("latest"))
 
 			repoName, tag = helpers.ParseDockerRef("foobar:5123/baz/bot")
-			Ω(repoName).Should(Equal("foobar:5123/baz/bot"))
-			Ω(tag).Should(Equal("latest"))
+			Expect(repoName).To(Equal("foobar:5123/baz/bot"))
+			Expect(tag).To(Equal("latest"))
 
 			repoName, tag = helpers.ParseDockerRef("baz/bot")
-			Ω(repoName).Should(Equal("baz/bot"))
-			Ω(tag).Should(Equal("latest"))
+			Expect(repoName).To(Equal("baz/bot"))
+			Expect(tag).To(Equal("latest"))
 		})
 	})
 
@@ -181,7 +181,7 @@ var _ = Describe("Builder helpers", func() {
 
 			It("should error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(err).Should(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -192,7 +192,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 			It("should error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(err).Should(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -205,7 +205,7 @@ var _ = Describe("Builder helpers", func() {
 
 			It("should error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(err).Should(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -228,15 +228,15 @@ var _ = Describe("Builder helpers", func() {
 
 			It("should not error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
 				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(img).ShouldNot(BeNil())
-				Ω(img.Config).ShouldNot(BeNil())
-				Ω(img.Config.Cmd).ShouldNot(BeNil())
-				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "-foobar", "bazbot"}))
+				Expect(img).NotTo(BeNil())
+				Expect(img.Config).NotTo(BeNil())
+				Expect(img.Config.Cmd).NotTo(BeNil())
+				Expect(img.Config.Cmd).To(Equal([]string{"/dockerapp", "-foobar", "bazbot"}))
 			})
 		})
 
@@ -260,14 +260,14 @@ var _ = Describe("Builder helpers", func() {
 
 			It("should not error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
 				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(img).ShouldNot(BeNil())
-				Ω(img.Config).ShouldNot(BeNil())
-				Ω(img.Config.Cmd).Should(Equal([]string{"/dockerapp", "arg1", "arg2"}))
+				Expect(img).NotTo(BeNil())
+				Expect(img.Config).NotTo(BeNil())
+				Expect(img.Config.Cmd).To(Equal([]string{"/dockerapp", "arg1", "arg2"}))
 			})
 		})
 
@@ -300,15 +300,15 @@ var _ = Describe("Builder helpers", func() {
 
 			It("should not error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the exposed ports", func() {
 				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
-				Ω(img.Config).ShouldNot(BeNil())
+				Expect(img.Config).NotTo(BeNil())
 
-				Ω(img.Config.ExposedPorts).Should(HaveKeyWithValue(nat.NewPort("udp", "53"), struct{}{}))
-				Ω(img.Config.ExposedPorts).Should(HaveKeyWithValue(nat.NewPort("tcp", "80"), struct{}{}))
+				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("udp", "53"), struct{}{}))
+				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("tcp", "80"), struct{}{}))
 			})
 		})
 
@@ -332,7 +332,7 @@ var _ = Describe("Builder helpers", func() {
 		Context("to an unwritable path on disk", func() {
 			It("should error", func() {
 				err := helpers.SaveMetadata("////tmp/", &metadata)
-				Ω(err).Should(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 			})
 		})
 		Context("with a writable path on disk", func() {
@@ -340,7 +340,7 @@ var _ = Describe("Builder helpers", func() {
 			BeforeEach(func() {
 				var err error
 				outputDir, err = ioutil.TempDir(os.TempDir(), "metadata")
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			AfterEach(func() {
@@ -350,36 +350,36 @@ var _ = Describe("Builder helpers", func() {
 			It("should output a json file", func() {
 				filename := path.Join(outputDir, "result.json")
 				err := helpers.SaveMetadata(filename, &metadata)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 				_, err = os.Stat(filename)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			Describe("the json", func() {
 				verifyMetadata := func(expectedEntryPoint []string, expectedStartCmd string) {
 					err := helpers.SaveMetadata(path.Join(outputDir, "result.json"), &metadata)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 					result := resultJSON(path.Join(outputDir, "result.json"))
 
 					var stagingResult docker_app_lifecycle.StagingDockerResult
 					err = json.Unmarshal(result, &stagingResult)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
-					Ω(stagingResult.ExecutionMetadata).ShouldNot(BeEmpty())
-					Ω(stagingResult.DetectedStartCommand).ShouldNot(BeEmpty())
+					Expect(stagingResult.ExecutionMetadata).NotTo(BeEmpty())
+					Expect(stagingResult.DetectedStartCommand).NotTo(BeEmpty())
 
 					var executionMetadata protocol.ExecutionMetadata
 					err = json.Unmarshal([]byte(stagingResult.ExecutionMetadata), &executionMetadata)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
-					Ω(executionMetadata.Cmd).Should(Equal(metadata.ExecutionMetadata.Cmd))
-					Ω(executionMetadata.Entrypoint).Should(Equal(expectedEntryPoint))
-					Ω(executionMetadata.Workdir).Should(Equal(metadata.ExecutionMetadata.Workdir))
+					Expect(executionMetadata.Cmd).To(Equal(metadata.ExecutionMetadata.Cmd))
+					Expect(executionMetadata.Entrypoint).To(Equal(expectedEntryPoint))
+					Expect(executionMetadata.Workdir).To(Equal(metadata.ExecutionMetadata.Workdir))
 
-					Ω(stagingResult.DetectedStartCommand).Should(HaveLen(1))
-					Ω(stagingResult.DetectedStartCommand).Should(HaveKeyWithValue("web", expectedStartCmd))
+					Expect(stagingResult.DetectedStartCommand).To(HaveLen(1))
+					Expect(stagingResult.DetectedStartCommand).To(HaveKeyWithValue("web", expectedStartCmd))
 
-					Ω(stagingResult.DockerImage).Should(Equal(metadata.DockerImage))
+					Expect(stagingResult.DockerImage).To(Equal(metadata.DockerImage))
 				}
 
 				It("should contain the metadata", func() {
