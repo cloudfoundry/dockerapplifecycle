@@ -66,6 +66,24 @@ func main() {
 		"Caches Docker images to private docker registry",
 	)
 
+	dockerLoginServer := flagSet.String(
+		"dockerLoginServer",
+		"",
+		"Docker Login server address",
+	)
+
+	dockerAuthToken := flagSet.String(
+		"dockerAuthToken",
+		"",
+		"Authentication token for pulling from docker registry",
+	)
+
+	dockerEmail := flagSet.String(
+		"dockerEmail",
+		"",
+		"Email for pulling from docker registry",
+	)
+
 	if err := flagSet.Parse(os.Args[1:len(os.Args)]); err != nil {
 		println(err.Error())
 		os.Exit(1)
@@ -98,6 +116,9 @@ func main() {
 		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
 		DockerDaemonTimeout:        10 * time.Second,
 		CacheDockerImage:           *cacheDockerImage,
+		DockerLoginServer:          *dockerLoginServer,
+		DockerAuthToken:            *dockerAuthToken,
+		DockerEmail:                *dockerEmail,
 	}
 
 	members := grouper.Members{
@@ -109,6 +130,9 @@ func main() {
 			println("missing flag: dockerRegistryAddresses required")
 			os.Exit(1)
 		}
+
+		validateCredentials(*dockerLoginServer, *dockerAuthToken, *dockerEmail)
+
 		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
 			println("docker daemon not found in", *dockerDaemonExecutablePath)
 			os.Exit(1)
@@ -133,6 +157,30 @@ func main() {
 	}
 
 	fmt.Println("Staging process finished")
+}
+
+func validateCredentials(server, token, email string) {
+	missing := len(server) == 0 && len(token) == 0 && len(email) == 0
+	present := len(server) > 0 && len(token) > 0 && len(email) > 0
+
+	if missing {
+		return
+	}
+
+	if !present {
+		println("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously")
+		os.Exit(1)
+	}
+
+	_, err := url.Parse(server)
+	if err != nil {
+		println(fmt.Sprintf("invalid dockerLoginServer [%s]", server))
+		os.Exit(1)
+	}
+	if !(strings.Contains(email, "@") && strings.Contains(email, ".")) {
+		println(fmt.Sprintf("invalid dockerEmail [%s]", email))
+		os.Exit(1)
+	}
 }
 
 func (r *registries) String() string {

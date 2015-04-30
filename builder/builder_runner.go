@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -24,6 +25,9 @@ type Builder struct {
 	DockerDaemonExecutablePath string
 	DockerDaemonTimeout        time.Duration
 	CacheDockerImage           bool
+	DockerLoginServer          string
+	DockerAuthToken            string
+	DockerEmail                string
 }
 
 func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
@@ -36,7 +40,7 @@ func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) err
 	close(ready)
 
 	select {
-	case err := <-builder.fetchMetadata():
+	case err := <-builder.build():
 		if err != nil {
 			return err
 		}
@@ -47,7 +51,7 @@ func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) err
 	return nil
 }
 
-func (builder *Builder) fetchMetadata() <-chan error {
+func (builder *Builder) build() <-chan error {
 	errorChan := make(chan error, 1)
 
 	go func() {
@@ -105,8 +109,13 @@ func (builder *Builder) fetchMetadata() <-chan error {
 func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
 	fmt.Println("Caching docker image ...")
 
+	err := builder.WriteDockerConfig()
+	if err != nil {
+		return "", err
+	}
+
 	fmt.Printf("Pulling docker image %s ...\n", dockerImage)
-	err := builder.RunDockerCommand("pull", dockerImage)
+	err = builder.RunDockerCommand("pull", dockerImage)
 	if err != nil {
 		return "", err
 	}
@@ -150,6 +159,21 @@ func (builder *Builder) GenerateImageName() (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s/%s", getRegistryAddress(builder.DockerRegistryAddresses), uuid), nil
+}
+
+func (builder *Builder) WriteDockerConfig() error {
+	if len(builder.DockerLoginServer) > 0 && len(builder.DockerAuthToken) > 0 && len(builder.DockerEmail) > 0 {
+		fmt.Printf("Saving configuration ...")
+
+		cfgTemplate := `{"%s": {"auth": "%s", "email": "%s"} }`
+		config := []byte(fmt.Sprintf(cfgTemplate, builder.DockerLoginServer, builder.DockerAuthToken, builder.DockerEmail))
+		err := ioutil.WriteFile(os.Getenv("HOME")+"/.dockercfg", config, 0644)
+
+		fmt.Println("Configuration saved.")
+		return err
+	}
+
+	return nil
 }
 
 func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {

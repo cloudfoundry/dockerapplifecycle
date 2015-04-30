@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"time"
 
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
@@ -26,6 +27,9 @@ var _ = Describe("Building", func() {
 		dockerRegistryAddresses    string
 		dockerDaemonExecutablePath string
 		cacheDockerImage           bool
+		dockerLoginServer          string
+		dockerAuthToken            string
+		dockerEmail                string
 		outputMetadataDir          string
 		outputMetadataJSONFilename string
 		fakeDockerRegistry         *ghttp.Server
@@ -93,6 +97,9 @@ var _ = Describe("Building", func() {
 		dockerRegistryAddresses = ""
 		dockerDaemonExecutablePath = ""
 		cacheDockerImage = false
+		dockerLoginServer = ""
+		dockerAuthToken = ""
+		dockerEmail = ""
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
 		Expect(err).NotTo(HaveOccurred())
@@ -126,6 +133,15 @@ var _ = Describe("Building", func() {
 		}
 		if len(dockerDaemonExecutablePath) > 0 {
 			args = append(args, "-dockerDaemonExecutablePath", dockerDaemonExecutablePath)
+		}
+		if len(dockerLoginServer) > 0 {
+			args = append(args, "-dockerLoginServer", dockerLoginServer)
+		}
+		if len(dockerAuthToken) > 0 {
+			args = append(args, "-dockerAuthToken", dockerAuthToken)
+		}
+		if len(dockerEmail) > 0 {
+			args = append(args, "-dockerEmail", dockerEmail)
 		}
 
 		builderCmd = exec.Command(builderPath, args...)
@@ -295,5 +311,84 @@ var _ = Describe("Building", func() {
 				})
 			})
 		})
+
+		Context("with invalid docker registry credentials", func() {
+			BeforeEach(func() {
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Expect(err).NotTo(HaveOccurred())
+				dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
+				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
+				cacheDockerImage = true
+			})
+
+			Context("without auth token", func() {
+				BeforeEach(func() {
+					dockerLoginServer = "http://loginserver.com"
+					dockerEmail = "mail@example.com"
+				})
+
+				It("errors", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("without email", func() {
+				BeforeEach(func() {
+					dockerLoginServer = "http://loginserver.com"
+					dockerAuthToken = "token"
+				})
+
+				It("errors", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("without login server", func() {
+				BeforeEach(func() {
+					dockerAuthToken = "token"
+					dockerEmail = "mail@example.com"
+				})
+
+				It("errors", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("with invalid email", func() {
+				BeforeEach(func() {
+					dockerAuthToken = "token"
+					dockerEmail = "invalid email"
+					dockerLoginServer = "http://loginserver.com"
+				})
+
+				It("errors", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say(regexp.QuoteMeta(fmt.Sprintf("invalid dockerEmail [%s]", dockerEmail))))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("with invalid login server URL", func() {
+				BeforeEach(func() {
+					dockerAuthToken = "token"
+					dockerEmail = "mail@example.com"
+					dockerLoginServer = "://missingSchema.com"
+				})
+
+				It("errors", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say(regexp.QuoteMeta(fmt.Sprintf("invalid dockerLoginServer [%s]", dockerLoginServer))))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+		})
+
 	})
+
 })

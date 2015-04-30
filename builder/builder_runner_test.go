@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -149,4 +150,46 @@ var _ = Describe("Builder runner", func() {
 
 	})
 
+	Describe("docker config", func() {
+		var builder main.Builder
+		confFile := os.Getenv("HOME") + "/.dockercfg"
+
+		AfterEach(func() {
+			os.Remove(confFile)
+		})
+
+		Context("with correct data", func() {
+
+			BeforeEach(func() {
+				builder = main.Builder{
+					DockerLoginServer: "server",
+					DockerEmail:       "email",
+					DockerAuthToken:   "token",
+				}
+				err := builder.WriteDockerConfig()
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("writes the config", func() {
+				bytes, err := ioutil.ReadFile(confFile)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(bytes)).To(Equal(`{"server": {"auth": "token", "email": "email"} }`))
+			})
+		})
+
+		Context("with missing data", func() {
+			BeforeEach(func() {
+				builder = main.Builder{
+					DockerLoginServer: "server",
+					DockerAuthToken:   "token",
+				}
+			})
+
+			It("does not write a config", func() {
+				_, err := os.Stat(confFile)
+				Expect(os.IsNotExist(err)).To(BeTrue())
+			})
+		})
+
+	})
 })
