@@ -47,6 +47,10 @@ var _ = Describe("HealthCheck", func() {
 	Context("when the address is not listening", func() {
 		BeforeEach(func() {
 			server.Close()
+			Eventually(func() error {
+				_, err := net.Dial("tcp", serverAddr)
+				return err
+			}).Should(HaveOccurred())
 		})
 
 		It("exits 1 and logs a failure", func() {
