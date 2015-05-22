@@ -3,13 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"time"
 
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/nu7hatch/gouuid"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
@@ -26,7 +26,8 @@ type Builder struct {
 	DockerDaemonTimeout        time.Duration
 	CacheDockerImage           bool
 	DockerLoginServer          string
-	DockerAuthToken            string
+	DockerUser                 string
+	DockerPassword             string
 	DockerEmail                string
 }
 
@@ -57,7 +58,13 @@ func (builder *Builder) build() <-chan error {
 	go func() {
 		defer close(errorChan)
 
-		img, err := helpers.FetchMetadata(builder.RepoName, builder.Tag, builder.InsecureDockerRegistries)
+		authConfig := &registry.AuthConfig{
+			Username:      builder.DockerUser,
+			Password:      builder.DockerPassword,
+			Email:         builder.DockerEmail,
+			ServerAddress: builder.DockerLoginServer,
+		}
+		img, err := helpers.FetchMetadata(builder.RepoName, builder.Tag, builder.InsecureDockerRegistries, authConfig)
 		if err != nil {
 			errorChan <- fmt.Errorf(
 				"failed to fetch metadata from [%s] with tag [%s] and insecure registries %s due to %s",
@@ -89,6 +96,7 @@ func (builder *Builder) build() <-chan error {
 				errorChan <- err
 				return
 			}
+
 		}
 
 		if err := helpers.SaveMetadata(builder.OutputFilename, &info); err != nil {
@@ -109,13 +117,17 @@ func (builder *Builder) build() <-chan error {
 func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
 	fmt.Println("Caching docker image ...")
 
-	err := builder.WriteDockerConfig()
-	if err != nil {
-		return "", err
+	if builder.CacheDockerImage && len(builder.DockerUser) > 0 && len(builder.DockerPassword) > 0 && len(builder.DockerEmail) > 0 {
+		fmt.Printf("Logging to %s ...\n", builder.DockerLoginServer)
+		err := builder.RunDockerCommand("login", "-u", builder.DockerUser, "-p", builder.DockerPassword, "-e", builder.DockerEmail, builder.DockerLoginServer)
+		if err != nil {
+			return "", err
+		}
+		fmt.Println("Logged in.")
 	}
 
 	fmt.Printf("Pulling docker image %s ...\n", dockerImage)
-	err = builder.RunDockerCommand("pull", dockerImage)
+	err := builder.RunDockerCommand("pull", dockerImage)
 	if err != nil {
 		return "", err
 	}
@@ -159,21 +171,6 @@ func (builder *Builder) GenerateImageName() (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s/%s", getRegistryAddress(builder.DockerRegistryAddresses), uuid), nil
-}
-
-func (builder *Builder) WriteDockerConfig() error {
-	if len(builder.DockerLoginServer) > 0 && len(builder.DockerAuthToken) > 0 && len(builder.DockerEmail) > 0 {
-		fmt.Printf("Saving configuration ...")
-
-		cfgTemplate := `{"%s": {"auth": "%s", "email": "%s"} }`
-		config := []byte(fmt.Sprintf(cfgTemplate, builder.DockerLoginServer, builder.DockerAuthToken, builder.DockerEmail))
-		err := ioutil.WriteFile(os.Getenv("HOME")+"/.dockercfg", config, 0644)
-
-		fmt.Println("Configuration saved.")
-		return err
-	}
-
-	return nil
 }
 
 func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {

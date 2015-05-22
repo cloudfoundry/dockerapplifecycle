@@ -46,7 +46,7 @@ func ParseDockerRef(dockerRef string) (string, string) {
 	return repoName, tag
 }
 
-func FetchMetadata(repoName string, tag string, insecureRegistries []string) (*image.Image, error) {
+func FetchMetadata(repoName string, tag string, insecureRegistries []string, authConfig *registry.AuthConfig) (*image.Image, error) {
 	hostname, repoName, err := registry.ResolveRepositoryName(repoName)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,6 @@ func FetchMetadata(repoName string, tag string, insecureRegistries []string) (*i
 		return nil, err
 	}
 
-	authConfig := &registry.AuthConfig{}
 	session, err := registry.NewSession(authConfig, utils.NewHTTPRequestFactory(), endpoint, true)
 	if err != nil {
 		return nil, err

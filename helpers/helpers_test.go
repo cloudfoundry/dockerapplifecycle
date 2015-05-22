@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/nat"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
 	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
@@ -158,6 +159,7 @@ var _ = Describe("Builder helpers", func() {
 		var repoName string
 		var tag string
 		var insecureRegistries []string
+		var authConfig *registry.AuthConfig
 
 		BeforeEach(func() {
 			server = ghttp.NewServer()
@@ -171,6 +173,7 @@ var _ = Describe("Builder helpers", func() {
 			tag = "latest"
 
 			insecureRegistries = []string{}
+			authConfig = &registry.AuthConfig{}
 		})
 
 		Context("with an invalid host", func() {
@@ -180,7 +183,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -191,7 +194,7 @@ var _ = Describe("Builder helpers", func() {
 				repoName = registryHost + "/some_user/not_some_repo"
 			})
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -204,7 +207,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -227,12 +230,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
@@ -259,12 +262,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).To(Equal([]string{"/dockerapp", "arg1", "arg2"}))
@@ -299,12 +302,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the exposed ports", func() {
-				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries)
+				img, _ := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(img.Config).NotTo(BeNil())
 
 				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("udp", "53"), struct{}{}))

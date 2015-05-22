@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit/grouper"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit/sigmon"
@@ -68,14 +69,20 @@ func main() {
 
 	dockerLoginServer := flagSet.String(
 		"dockerLoginServer",
-		"",
+		registry.IndexServerAddress(),
 		"Docker Login server address",
 	)
 
-	dockerAuthToken := flagSet.String(
-		"dockerAuthToken",
+	dockerUser := flagSet.String(
+		"dockerUser",
 		"",
-		"Authentication token for pulling from docker registry",
+		"User for pulling from docker registry",
+	)
+
+	dockerPassword := flagSet.String(
+		"dockerPassword",
+		"",
+		"Password for pulling from docker registry",
 	)
 
 	dockerEmail := flagSet.String(
@@ -117,7 +124,8 @@ func main() {
 		DockerDaemonTimeout:        10 * time.Second,
 		CacheDockerImage:           *cacheDockerImage,
 		DockerLoginServer:          *dockerLoginServer,
-		DockerAuthToken:            *dockerAuthToken,
+		DockerUser:                 *dockerUser,
+		DockerPassword:             *dockerPassword,
 		DockerEmail:                *dockerEmail,
 	}
 
@@ -131,7 +139,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		validateCredentials(*dockerLoginServer, *dockerAuthToken, *dockerEmail)
+		validateCredentials(*dockerLoginServer, *dockerUser, *dockerPassword, *dockerEmail)
 
 		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
 			println("docker daemon not found in", *dockerDaemonExecutablePath)
@@ -159,27 +167,30 @@ func main() {
 	fmt.Println("Staging process finished")
 }
 
-func validateCredentials(server, token, email string) {
-	missing := len(server) == 0 && len(token) == 0 && len(email) == 0
-	present := len(server) > 0 && len(token) > 0 && len(email) > 0
+func validateCredentials(server, user, password, email string) {
+	missing := len(user) == 0 && len(password) == 0 && len(email) == 0
+	present := len(user) > 0 && len(password) > 0 && len(email) > 0
 
 	if missing {
 		return
 	}
 
 	if !present {
-		println("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously")
+		println("missing flags: dockerUser, dockerPassword and dockerEmail required simultaneously")
 		os.Exit(1)
 	}
 
-	_, err := url.Parse(server)
-	if err != nil {
-		println(fmt.Sprintf("invalid dockerLoginServer [%s]", server))
-		os.Exit(1)
-	}
 	if !(strings.Contains(email, "@") && strings.Contains(email, ".")) {
 		println(fmt.Sprintf("invalid dockerEmail [%s]", email))
 		os.Exit(1)
+	}
+
+	if len(server) > 0 {
+		_, err := url.Parse(server)
+		if err != nil {
+			println(fmt.Sprintf("invalid dockerLoginServer [%s]", server))
+			os.Exit(1)
+		}
 	}
 }
 

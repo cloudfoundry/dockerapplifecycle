@@ -28,7 +28,8 @@ var _ = Describe("Building", func() {
 		dockerDaemonExecutablePath string
 		cacheDockerImage           bool
 		dockerLoginServer          string
-		dockerAuthToken            string
+		dockerUser                 string
+		dockerPassword             string
 		dockerEmail                string
 		outputMetadataDir          string
 		outputMetadataJSONFilename string
@@ -98,7 +99,8 @@ var _ = Describe("Building", func() {
 		dockerDaemonExecutablePath = ""
 		cacheDockerImage = false
 		dockerLoginServer = ""
-		dockerAuthToken = ""
+		dockerUser = ""
+		dockerPassword = ""
 		dockerEmail = ""
 
 		outputMetadataDir, err = ioutil.TempDir("", "building-result")
@@ -137,8 +139,11 @@ var _ = Describe("Building", func() {
 		if len(dockerLoginServer) > 0 {
 			args = append(args, "-dockerLoginServer", dockerLoginServer)
 		}
-		if len(dockerAuthToken) > 0 {
-			args = append(args, "-dockerAuthToken", dockerAuthToken)
+		if len(dockerUser) > 0 {
+			args = append(args, "-dockerUser", dockerUser)
+		}
+		if len(dockerPassword) > 0 {
+			args = append(args, "-dockerPassword", dockerPassword)
 		}
 		if len(dockerEmail) > 0 {
 			args = append(args, "-dockerEmail", dockerEmail)
@@ -321,48 +326,46 @@ var _ = Describe("Building", func() {
 				cacheDockerImage = true
 			})
 
-			Context("without auth token", func() {
+			whenFlagsMissing := func() {
+				session := setupBuilder()
+				Eventually(session.Err).Should(gbytes.Say("missing flags: dockerUser, dockerPassword and dockerEmail required simultaneously"))
+				Eventually(session).Should(gexec.Exit(1))
+			}
+
+			Context("without user", func() {
 				BeforeEach(func() {
 					dockerLoginServer = "http://loginserver.com"
+					dockerPassword = "password"
 					dockerEmail = "mail@example.com"
 				})
 
-				It("errors", func() {
-					session := setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously"))
-					Eventually(session).Should(gexec.Exit(1))
+				It("errors", whenFlagsMissing)
+			})
+
+			Context("without password", func() {
+				BeforeEach(func() {
+					dockerLoginServer = "http://loginserver.com"
+					dockerUser = "user"
+					dockerEmail = "email@example.com"
 				})
+
+				It("errors", whenFlagsMissing)
 			})
 
 			Context("without email", func() {
 				BeforeEach(func() {
 					dockerLoginServer = "http://loginserver.com"
-					dockerAuthToken = "token"
+					dockerUser = "user"
+					dockerPassword = "password"
 				})
 
-				It("errors", func() {
-					session := setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously"))
-					Eventually(session).Should(gexec.Exit(1))
-				})
-			})
-
-			Context("without login server", func() {
-				BeforeEach(func() {
-					dockerAuthToken = "token"
-					dockerEmail = "mail@example.com"
-				})
-
-				It("errors", func() {
-					session := setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say("missing flags: dockerLoginServer, dockerAuthToken and dockerEmail required simultaneously"))
-					Eventually(session).Should(gexec.Exit(1))
-				})
+				It("errors", whenFlagsMissing)
 			})
 
 			Context("with invalid email", func() {
 				BeforeEach(func() {
-					dockerAuthToken = "token"
+					dockerUser = "user"
+					dockerPassword = "password"
 					dockerEmail = "invalid email"
 					dockerLoginServer = "http://loginserver.com"
 				})
@@ -376,7 +379,8 @@ var _ = Describe("Building", func() {
 
 			Context("with invalid login server URL", func() {
 				BeforeEach(func() {
-					dockerAuthToken = "token"
+					dockerUser = "user"
+					dockerPassword = "password"
 					dockerEmail = "mail@example.com"
 					dockerLoginServer = "://missingSchema.com"
 				})
@@ -390,5 +394,4 @@ var _ = Describe("Building", func() {
 		})
 
 	})
-
 })
