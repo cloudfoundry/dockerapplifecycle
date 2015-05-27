@@ -8,7 +8,7 @@ import (
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gexec"
 )
 
-var healthcheck string
+var healthCheck string
 
 func TestDockerLifecycleHealthCheck(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -20,7 +20,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	Expect(err).NotTo(HaveOccurred())
 	return []byte(healthcheckPath)
 }, func(healthcheckPath []byte) {
-	healthcheck = string(healthcheckPath)
+	healthCheck = string(healthcheckPath)
 })
 
 var _ = SynchronizedAfterSuite(func() {
