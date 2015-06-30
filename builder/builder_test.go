@@ -393,5 +393,80 @@ var _ = Describe("Building", func() {
 			})
 		})
 
+		Context("with exposed ports in image metadata", func() {
+			BeforeEach(func() {
+				dockerImageURL = buildDockerImageURL()
+				cacheDockerImage = false
+
+				setupFakeDockerRegistry()
+			})
+
+			setupRegistryResponse := func(response string) {
+				fakeDockerRegistry.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+							w.Header().Add("X-Docker-Size", "789")
+							w.Write([]byte(response))
+						}),
+					),
+				)
+			}
+
+			Context("with correct ports", func() {
+				BeforeEach(func() {
+					setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir", "ExposedPorts": {"8081/udp":{}, "8081/tcp":{}, "8079/tcp":{}, "8078/udp":{}} }}`)
+				})
+
+				Describe("the json", func() {
+					It("should contain sorted exposed ports", func() {
+						session := setupBuilder()
+						Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+
+						result := resultJSON()
+
+						Expect(result).To(ContainSubstring(`\"ports\":[{\"Port\":8078,\"Protocol\":\"udp\"},{\"Port\":8079,\"Protocol\":\"tcp\"},{\"Port\":8081,\"Protocol\":\"tcp\"},{\"Port\":8081,\"Protocol\":\"udp\"}]`))
+					})
+				})
+			})
+
+			Context("with incorrect port", func() {
+				Context("bigger than allowed uint16 range", func() {
+					BeforeEach(func() {
+						setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir", "ExposedPorts": {"8081/tcp":{}, "65536/tcp":{}, "8078/udp":{}} }}`)
+					})
+
+					It("should error", func() {
+						session := setupBuilder()
+						Eventually(session.Err).Should(gbytes.Say("value out of range"))
+						Eventually(session, 10*time.Second).Should(gexec.Exit(2))
+					})
+				})
+
+				Context("negative port", func() {
+					BeforeEach(func() {
+						setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir", "ExposedPorts": {"8081/tcp":{}, "-8078/udp":{}} }}`)
+					})
+
+					It("should error", func() {
+						session := setupBuilder()
+						Eventually(session.Err).Should(gbytes.Say("invalid syntax"))
+						Eventually(session, 10*time.Second).Should(gexec.Exit(2))
+					})
+				})
+
+				Context("not a number", func() {
+					BeforeEach(func() {
+						setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir", "ExposedPorts": {"8081/tcp":{}, "8a8a/udp":{}} }}`)
+					})
+
+					It("should error", func() {
+						session := setupBuilder()
+						Eventually(session.Err).Should(gbytes.Say("invalid syntax"))
+						Eventually(session, 10*time.Second).Should(gexec.Exit(2))
+					})
+				})
+			})
+		})
 	})
 })

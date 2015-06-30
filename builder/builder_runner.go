@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/nat"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/nu7hatch/gouuid"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
@@ -81,6 +83,13 @@ func (builder *Builder) build() <-chan error {
 			info.ExecutionMetadata.Cmd = img.Config.Cmd
 			info.ExecutionMetadata.Entrypoint = img.Config.Entrypoint
 			info.ExecutionMetadata.Workdir = img.Config.WorkingDir
+			info.ExecutionMetadata.ExposedPorts, err = extractPorts(img.Config.ExposedPorts)
+			if err != nil {
+				portDetails := fmt.Sprintf("%v", img.Config.ExposedPorts)
+				println("failed to parse image ports", portDetails, err.Error())
+				errorChan <- err
+				return
+			}
 		}
 
 		dockerImageURL := builder.RepoName
@@ -112,6 +121,29 @@ func (builder *Builder) build() <-chan error {
 	}()
 
 	return errorChan
+}
+
+func extractPorts(dockerPorts map[nat.Port]struct{}) (exposedPorts []protocol.Port, err error) {
+	sortedPorts := sortPorts(dockerPorts)
+	for _, port := range sortedPorts {
+		exposedPort, err := strconv.ParseUint(port.Port(), 10, 16)
+		if err != nil {
+			return []protocol.Port{}, err
+		}
+		exposedPorts = append(exposedPorts, protocol.Port{Port: uint16(exposedPort), Protocol: port.Proto()})
+	}
+	return exposedPorts, nil
+}
+
+func sortPorts(dockerPorts map[nat.Port]struct{}) []nat.Port {
+	var dockerPortsSlice []nat.Port
+	for port := range dockerPorts {
+		dockerPortsSlice = append(dockerPortsSlice, port)
+	}
+	nat.Sort(dockerPortsSlice, func(ip, jp nat.Port) bool {
+		return ip.Int() < jp.Int() || (ip.Int() == jp.Int() && ip.Proto() == "tcp")
+	})
+	return dockerPortsSlice
 }
 
 func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
