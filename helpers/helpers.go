@@ -77,18 +77,20 @@ func FetchMetadata(repoName string, tag string, insecureRegistries []string, aut
 		return nil, fmt.Errorf("unknown tag: %s:%s", repoName, tag)
 	}
 
+	errors := make([]string, 0)
 	for _, endpoint := range repoData.Endpoints {
 		imgJSON, _, err := session.GetRemoteImageJSON(imgID, endpoint, repoData.Tokens)
 		if err == nil {
-			img, err := image.NewImgJSON(imgJSON)
-			if err != nil {
-				return nil, err
+			img, parseErr := image.NewImgJSON(imgJSON)
+			if parseErr != nil {
+				return nil, parseErr
 			}
-			return img, err
+			return img, nil
 		}
+		errors = append(errors, endpoint+": "+err.Error())
 	}
 
-	return nil, fmt.Errorf("all endpoints failed: %s", err)
+	return nil, fmt.Errorf("all endpoints failed: [%s]", strings.Join(errors, ", "))
 }
 
 func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error {

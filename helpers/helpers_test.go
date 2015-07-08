@@ -193,6 +193,7 @@ var _ = Describe("Builder helpers", func() {
 				setupPingableRegistry()
 				repoName = registryHost + "/some_user/not_some_repo"
 			})
+
 			It("should error", func() {
 				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
 				Expect(err).To(HaveOccurred())
@@ -282,10 +283,10 @@ var _ = Describe("Builder helpers", func() {
 
 				endpoint1.AppendHandlers(
 					ghttp.CombineHandlers(
-						// Docker Image config: https://github.com/docker/docker/blob/master/runconfig/fixtures/container_config_1_19.json
 						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
 						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 							w.Header().Add("X-Docker-Size", "789")
+							// Docker Image config: https://github.com/docker/docker/blob/master/runconfig/fixtures/container_config_1_19.json
 							w.Write([]byte(`{"id": "layer-1",
 							                 "parent": "parent-1",
 															 "Config": {
@@ -312,6 +313,39 @@ var _ = Describe("Builder helpers", func() {
 
 				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("udp", "53"), struct{}{}))
 				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("tcp", "80"), struct{}{}))
+			})
+		})
+
+		Context("when all endpoints fail", func() {
+			BeforeEach(func() {
+				setupRegistry()
+
+				repoName = registryHost + "/some_user/some_repo"
+
+				endpoint1.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+							w.WriteHeader(http.StatusTemporaryRedirect)
+						}),
+					),
+				)
+				endpoint2.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+							w.WriteHeader(http.StatusTemporaryRedirect)
+						}),
+					),
+				)
+
+			})
+
+			It("should error", func() {
+				_, err := helpers.FetchMetadata(repoName, tag, insecureRegistries, authConfig)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(endpoint1.URL()))
+				Expect(err.Error()).To(ContainSubstring(endpoint2.URL()))
 			})
 		})
 
