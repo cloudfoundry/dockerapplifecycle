@@ -5,6 +5,7 @@ type ExecutionMetadata struct {
 	Entrypoint   []string `json:"entrypoint,omitempty"`
 	Workdir      string   `json:"workdir,omitempty"`
 	ExposedPorts []Port   `json:"ports,omitempty"`
+	User         string   `json:"user,omitempty"`
 }
 
 type DockerImageMetadata struct {

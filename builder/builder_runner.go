@@ -83,6 +83,7 @@ func (builder *Builder) build() <-chan error {
 			info.ExecutionMetadata.Cmd = img.Config.Cmd
 			info.ExecutionMetadata.Entrypoint = img.Config.Entrypoint
 			info.ExecutionMetadata.Workdir = img.Config.WorkingDir
+			info.ExecutionMetadata.User = img.Config.User
 			info.ExecutionMetadata.ExposedPorts, err = extractPorts(img.Config.ExposedPorts)
 			if err != nil {
 				portDetails := fmt.Sprintf("%v", img.Config.ExposedPorts)

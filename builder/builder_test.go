@@ -76,6 +76,18 @@ var _ = Describe("Building", func() {
 		)
 	}
 
+	setupRegistryResponse := func(response string) {
+		fakeDockerRegistry.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Header().Add("X-Docker-Size", "789")
+					w.Write([]byte(response))
+				}),
+			),
+		)
+	}
+
 	buildDockerImageURL := func() string {
 		parts, err := url.Parse(fakeDockerRegistry.URL())
 		Expect(err).NotTo(HaveOccurred())
@@ -401,18 +413,6 @@ var _ = Describe("Building", func() {
 				setupFakeDockerRegistry()
 			})
 
-			setupRegistryResponse := func(response string) {
-				fakeDockerRegistry.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
-						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-							w.Header().Add("X-Docker-Size", "789")
-							w.Write([]byte(response))
-						}),
-					),
-				)
-			}
-
 			Context("with correct ports", func() {
 				BeforeEach(func() {
 					setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir", "ExposedPorts": {"8081/udp":{}, "8081/tcp":{}, "8079/tcp":{}, "8078/udp":{}} }}`)
@@ -467,6 +467,28 @@ var _ = Describe("Building", func() {
 					})
 				})
 			})
+		})
+
+		Context("with specified user in image metadata", func() {
+			BeforeEach(func() {
+				dockerImageURL = buildDockerImageURL()
+				cacheDockerImage = false
+
+				setupFakeDockerRegistry()
+				setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir", "User": "custom-user"}}`)
+			})
+
+			Describe("the json", func() {
+				It("should contain custom user", func() {
+					session := setupBuilder()
+					Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+
+					result := resultJSON()
+
+					Expect(result).To(ContainSubstring(`\"user\":\"custom-user\"`))
+				})
+			})
+
 		})
 	})
 })
