@@ -2,20 +2,26 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
+	"time"
 )
 
 var DockerArgs []string = []string{"--daemon=true", "--iptables=false", "--ipv6=false", `--log-level="error"`}
 
 type DockerDaemon struct {
 	DockerDaemonPath         string
+	DockerRegistryIPs        []string
 	InsecureDockerRegistries []string
+	DockerRegistryHost       string
 }
 
 func (daemon *DockerDaemon) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
+	addHost(daemon.DockerRegistryHost, daemon.DockerRegistryIPs)
+
 	daemonProcess, errorChannel := launchDockerDaemon(daemon.DockerDaemonPath, daemon.InsecureDockerRegistries)
 	close(ready)
 
@@ -71,4 +77,28 @@ func launchDockerDaemon(daemonPath string, insecureDockerRegistriesList []string
 	}()
 
 	return cmd.Process, chanError
+}
+
+func addHost(dockerRegistryHost string, dockerRegistryIPs []string) error {
+	return addLineToFile("/etc/hosts", fmt.Sprintf("%s %s\n", getRegistryIP(dockerRegistryIPs), dockerRegistryHost))
+}
+
+func getRegistryIP(registryIPs []string) string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return registryIPs[r.Intn(len(registryIPs))]
+}
+
+func addLineToFile(filePath string, line string) error {
+	hostsFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+
+	defer hostsFile.Close()
+
+	if _, err = hostsFile.WriteString(line); err != nil {
+		return err
+	}
+
+	return nil
 }

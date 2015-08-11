@@ -3,6 +3,7 @@ package main_test
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,7 +25,9 @@ var _ = Describe("Building", func() {
 		dockerRef                  string
 		dockerImageURL             string
 		insecureDockerRegistries   string
-		dockerRegistryAddresses    string
+		dockerRegistryIPs          string
+		dockerRegistryHost         string
+		dockerRegistryPort         string
 		dockerDaemonExecutablePath string
 		cacheDockerImage           bool
 		dockerLoginServer          string
@@ -107,7 +110,9 @@ var _ = Describe("Building", func() {
 		dockerRef = ""
 		dockerImageURL = ""
 		insecureDockerRegistries = ""
-		dockerRegistryAddresses = ""
+		dockerRegistryIPs = ""
+		dockerRegistryHost = ""
+		dockerRegistryPort = ""
 		dockerDaemonExecutablePath = ""
 		cacheDockerImage = false
 		dockerLoginServer = ""
@@ -139,8 +144,14 @@ var _ = Describe("Building", func() {
 		if len(insecureDockerRegistries) > 0 {
 			args = append(args, "-insecureDockerRegistries", insecureDockerRegistries)
 		}
-		if len(dockerRegistryAddresses) > 0 {
-			args = append(args, "-dockerRegistryAddresses", dockerRegistryAddresses)
+		if len(dockerRegistryIPs) > 0 {
+			args = append(args, "-dockerRegistryIPs", dockerRegistryIPs)
+		}
+		if len(dockerRegistryHost) > 0 {
+			args = append(args, "-dockerRegistryHost", dockerRegistryHost)
+		}
+		if len(dockerRegistryPort) > 0 {
+			args = append(args, "-dockerRegistryPort", dockerRegistryPort)
 		}
 		if cacheDockerImage {
 			args = append(args, "-cacheDockerImage")
@@ -224,13 +235,98 @@ var _ = Describe("Building", func() {
 
 				parts, err := url.Parse(fakeDockerRegistry.URL())
 				Expect(err).NotTo(HaveOccurred())
-				dockerRegistryAddresses = parts.Host
+				dockerRegistryIPs, _, err = net.SplitHostPort(parts.Host)
+				Expect(err).NotTo(HaveOccurred())
+
+				dockerRegistryHost = "url"
 			})
 
 			It("should exit with an error", func() {
 				session := setupBuilder()
 				Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("docker daemon not found in %s", dockerDaemonExecutablePath)))
 				Eventually(session).Should(gexec.Exit(1))
+			})
+		})
+
+		Context("when docker registry host is invalid", func() {
+			BeforeEach(func() {
+				cacheDockerImage = true
+				dockerImageURL = buildDockerImageURL()
+
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Expect(err).NotTo(HaveOccurred())
+				dockerRegistryIPs, _, err = net.SplitHostPort(parts.Host)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			Context("host is missing", func() {
+				It("should exit with an error", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("missing flag: dockerRegistryHost required"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("host contains schema", func() {
+				BeforeEach(func() {
+					dockerRegistryHost = "https://docker-registry"
+				})
+
+				It("should exit with an error", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("invalid host format https://docker-registry"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("host contains port", func() {
+				BeforeEach(func() {
+					dockerRegistryHost = "docker-registry:8080"
+				})
+
+				It("should exit with an error", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("invalid host format docker-registry:8080"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+		})
+
+		Context("when docker registry port is invalid", func() {
+			BeforeEach(func() {
+				cacheDockerImage = true
+				dockerImageURL = buildDockerImageURL()
+
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Expect(err).NotTo(HaveOccurred())
+				dockerRegistryIPs, _, err = net.SplitHostPort(parts.Host)
+				Expect(err).NotTo(HaveOccurred())
+
+				dockerRegistryHost = "host"
+			})
+
+			Context("and port is negative", func() {
+				BeforeEach(func() {
+					dockerRegistryPort = "-1"
+				})
+
+				It("should exit with an error", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("negative port number"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
+			})
+
+			Context("and port is out of range", func() {
+				BeforeEach(func() {
+					dockerRegistryPort = "65536"
+				})
+
+				It("should exit with an error", func() {
+					session := setupBuilder()
+					Eventually(session.Err).Should(gbytes.Say("port number too big 65536"))
+					Eventually(session).Should(gexec.Exit(1))
+				})
 			})
 		})
 
@@ -290,6 +386,7 @@ var _ = Describe("Building", func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
 				Expect(err).NotTo(HaveOccurred())
 				insecureDockerRegistries = parts.Host + ",10.244.2.6:80"
+				dockerRegistryHost = "docker-registry.service.cf.internal"
 			})
 
 			Context("with a valid docker url", dockerURLFunc)
@@ -300,7 +397,10 @@ var _ = Describe("Building", func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
 				Expect(err).NotTo(HaveOccurred())
-				dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
+				host, _, err := net.SplitHostPort(parts.Host)
+				Expect(err).NotTo(HaveOccurred())
+
+				dockerRegistryIPs = host + ",10.244.2.6"
 			})
 
 			Context("with a valid docker url", dockerURLFunc)
@@ -323,7 +423,7 @@ var _ = Describe("Building", func() {
 
 				It("should error", func() {
 					session = setupBuilder()
-					Eventually(session.Err).Should(gbytes.Say("missing flag: dockerRegistryAddresses required"))
+					Eventually(session.Err).Should(gbytes.Say("missing flag: dockerRegistryIPs required"))
 					Eventually(session).Should(gexec.Exit(1))
 				})
 			})
@@ -333,7 +433,11 @@ var _ = Describe("Building", func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
 				Expect(err).NotTo(HaveOccurred())
-				dockerRegistryAddresses = parts.Host + ",10.244.2.6:80"
+				host, _, err := net.SplitHostPort(parts.Host)
+				Expect(err).NotTo(HaveOccurred())
+				dockerRegistryIPs = host + ",10.244.2.6"
+
+				dockerRegistryHost = "docker-registry.service.cf.internal"
 				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
 				cacheDockerImage = true
 			})

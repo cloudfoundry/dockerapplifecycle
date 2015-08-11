@@ -18,10 +18,11 @@ import (
 )
 
 type registries []string
+type ips []string
 
 func main() {
 	var insecureDockerRegistries registries
-	var dockerRegistryAddresses registries
+	var dockerRegistryIPs ips
 
 	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
 
@@ -46,13 +47,7 @@ func main() {
 	flagSet.Var(
 		&insecureDockerRegistries,
 		"insecureDockerRegistries",
-		"Insecure Docker Registry addresses (ip:port)",
-	)
-
-	flagSet.Var(
-		&dockerRegistryAddresses,
-		"dockerRegistryAddresses",
-		"Docker Registry addresses (ip:port)",
+		"insecure Docker Registry addresses (host:port)",
 	)
 
 	dockerDaemonExecutablePath := flagSet.String(
@@ -65,6 +60,24 @@ func main() {
 		"cacheDockerImage",
 		false,
 		"Caches Docker images to private docker registry",
+	)
+
+	flagSet.Var(
+		&dockerRegistryIPs,
+		"dockerRegistryIPs",
+		"Docker Registry IPs",
+	)
+
+	dockerRegistryHost := flagSet.String(
+		"dockerRegistryHost",
+		"",
+		"Docker Registry host",
+	)
+
+	dockerRegistryPort := flagSet.Int(
+		"dockerRegistryPort",
+		8080,
+		"Docker Registry port",
 	)
 
 	dockerLoginServer := flagSet.String(
@@ -115,14 +128,16 @@ func main() {
 	}
 
 	builder := Builder{
-		RepoName: repoName,
-		Tag:      tag,
-		DockerRegistryAddresses:    dockerRegistryAddresses,
-		InsecureDockerRegistries:   insecureDockerRegistries,
+		RepoName:                   repoName,
+		Tag:                        tag,
 		OutputFilename:             *outputFilename,
 		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
+		InsecureDockerRegistries:   insecureDockerRegistries,
 		DockerDaemonTimeout:        10 * time.Second,
 		CacheDockerImage:           *cacheDockerImage,
+		DockerRegistryIPs:          dockerRegistryIPs,
+		DockerRegistryHost:         *dockerRegistryHost,
+		DockerRegistryPort:         *dockerRegistryPort,
 		DockerLoginServer:          *dockerLoginServer,
 		DockerUser:                 *dockerUser,
 		DockerPassword:             *dockerPassword,
@@ -134,8 +149,24 @@ func main() {
 	}
 
 	if *cacheDockerImage {
-		if len(dockerRegistryAddresses) == 0 {
-			println("missing flag: dockerRegistryAddresses required")
+		if len(dockerRegistryIPs) == 0 {
+			println("missing flag: dockerRegistryIPs required")
+			os.Exit(1)
+		}
+		if len(*dockerRegistryHost) == 0 {
+			println("missing flag: dockerRegistryHost required")
+			os.Exit(1)
+		}
+		if strings.Contains(*dockerRegistryHost, ":") {
+			println("invalid host format", *dockerRegistryHost)
+			os.Exit(1)
+		}
+		if *dockerRegistryPort < 0 {
+			println("negative port number", *dockerRegistryPort)
+			os.Exit(1)
+		}
+		if *dockerRegistryPort > 65535 {
+			println("port number too big", *dockerRegistryPort)
 			os.Exit(1)
 		}
 
@@ -149,6 +180,8 @@ func main() {
 		dockerDaemon := DockerDaemon{
 			DockerDaemonPath:         *dockerDaemonExecutablePath,
 			InsecureDockerRegistries: insecureDockerRegistries,
+			DockerRegistryIPs:        dockerRegistryIPs,
+			DockerRegistryHost:       *dockerRegistryHost,
 		}
 		members = append(members, grouper.Member{"docker_daemon", ifrit.RunFunc(dockerDaemon.Run)})
 	}
@@ -200,7 +233,7 @@ func (r *registries) String() string {
 
 func (r *registries) Set(value string) error {
 	if len(*r) > 0 {
-		return errors.New("Docker Registries flag already set")
+		return errors.New("Insecure Docker Registries flag already set")
 	}
 	for _, reg := range strings.Split(value, ",") {
 		registry := strings.TrimSpace(reg)
@@ -211,6 +244,24 @@ func (r *registries) Set(value string) error {
 			return errors.New("ip:port expected for Docker Registry [" + registry + "]")
 		}
 		*r = append(*r, registry)
+	}
+	return nil
+}
+
+func (r *ips) String() string {
+	return fmt.Sprint(*r)
+}
+
+func (r *ips) Set(value string) error {
+	if len(*r) > 0 {
+		return errors.New("Docker Registry IPs flag already set")
+	}
+	for _, el := range strings.Split(value, ",") {
+		element := strings.TrimSpace(el)
+		if strings.Contains(element, ":") {
+			return errors.New("unexpected format for [" + element + "]")
+		}
+		*r = append(*r, element)
 	}
 	return nil
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,12 +20,14 @@ import (
 type Builder struct {
 	RepoName                   string
 	Tag                        string
-	DockerRegistryAddresses    []string
 	InsecureDockerRegistries   []string
 	OutputFilename             string
 	DockerDaemonExecutablePath string
 	DockerDaemonTimeout        time.Duration
 	CacheDockerImage           bool
+	DockerRegistryIPs          []string
+	DockerRegistryHost         string
+	DockerRegistryPort         int
 	DockerLoginServer          string
 	DockerUser                 string
 	DockerPassword             string
@@ -203,7 +204,7 @@ func (builder *Builder) GenerateImageName() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s/%s", getRegistryAddress(builder.DockerRegistryAddresses), uuid), nil
+	return fmt.Sprintf("%s:%d/%s", builder.DockerRegistryHost, builder.DockerRegistryPort, uuid), nil
 }
 
 func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
@@ -256,9 +257,4 @@ func pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-c
 	}
 	errChan <- nil
 	return
-}
-
-func getRegistryAddress(registryAddresses []string) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return registryAddresses[r.Intn(len(registryAddresses))]
 }

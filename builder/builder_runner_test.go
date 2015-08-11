@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -73,8 +74,10 @@ var _ = Describe("Builder runner", func() {
 
 	Describe("cached tags generation", func() {
 		var (
-			builder                 main.Builder
-			dockerRegistryAddresses []string
+			builder            main.Builder
+			dockerRegistryIPs  []string
+			dockerRegistryHost string
+			dockerRegistryPort int
 		)
 
 		generateTag := func() (string, string) {
@@ -83,7 +86,6 @@ var _ = Describe("Builder runner", func() {
 
 			parts := strings.Split(image, "/")
 			Expect(parts).To(HaveLen(2))
-			Expect(dockerRegistryAddresses).To(ContainElement(parts[0]))
 
 			return parts[0], parts[1]
 		}
@@ -111,30 +113,25 @@ var _ = Describe("Builder runner", func() {
 
 		BeforeEach(func() {
 			builder = main.Builder{
-				DockerRegistryAddresses: dockerRegistryAddresses,
+				DockerRegistryIPs:  dockerRegistryIPs,
+				DockerRegistryHost: dockerRegistryHost,
+				DockerRegistryPort: dockerRegistryPort,
 			}
 		})
 
 		Context("when there are several Docker Registry addresses", func() {
-			dockerRegistryAddresses = []string{"one", "two", "three", "four"}
+			dockerRegistryIPs = []string{"one", "two", "three", "four"}
+			dockerRegistryHost = "docker-registry.service.cf.internal"
+			dockerRegistryPort = 8080
 
 			Describe("addresses", func() {
-				generatedAddresses := make(map[string]bool, len(dockerRegistryAddresses))
-
-				allAddressesSelected := func() bool {
+				hostOnly := func() string {
 					address, _ := generateTag()
-					generatedAddresses[address] = true
-
-					for _, address := range dockerRegistryAddresses {
-						if !generatedAddresses[address] {
-							return false
-						}
-					}
-					return true
+					return address
 				}
 
-				It("selects all addresses", func() {
-					Eventually(allAddressesSelected).Should(BeTrue())
+				It("uses docker registry host and port", func() {
+					Consistently(hostOnly).Should(Equal(fmt.Sprintf("%s:%d", dockerRegistryHost, dockerRegistryPort)))
 				})
 			})
 
@@ -142,7 +139,7 @@ var _ = Describe("Builder runner", func() {
 		})
 
 		Context("when there is a single Docker Registry address", func() {
-			dockerRegistryAddresses = []string{"one"}
+			dockerRegistryIPs = []string{"one"}
 
 			Describe("image names", imageGeneration)
 		})
