@@ -115,13 +115,16 @@ func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error
 	if len(metadata.ExecutionMetadata.Entrypoint) > 0 {
 		startCommand = strings.Join([]string{strings.Join(metadata.ExecutionMetadata.Entrypoint, " "), startCommand}, " ")
 	}
-	err = json.NewEncoder(resultFile).Encode(docker_app_lifecycle.StagingDockerResult{
-		ExecutionMetadata: string(executionMetadataJSON),
-		DetectedStartCommand: map[string]string{
+
+	err = json.NewEncoder(resultFile).Encode(docker_app_lifecycle.NewStagingResult(
+		docker_app_lifecycle.ProcessTypes{
 			"web": startCommand,
 		},
-		DockerImage: metadata.DockerImage,
-	})
+		docker_app_lifecycle.LifecycleMetadata{
+			DockerImage: metadata.DockerImage,
+		},
+		string(executionMetadataJSON),
+	))
 	if err != nil {
 		return err
 	}

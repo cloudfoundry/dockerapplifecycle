@@ -398,12 +398,12 @@ var _ = Describe("Builder helpers", func() {
 					Expect(err).NotTo(HaveOccurred())
 					result := resultJSON(path.Join(outputDir, "result.json"))
 
-					var stagingResult docker_app_lifecycle.StagingDockerResult
+					var stagingResult docker_app_lifecycle.StagingResult
 					err = json.Unmarshal(result, &stagingResult)
 					Expect(err).NotTo(HaveOccurred())
 
 					Expect(stagingResult.ExecutionMetadata).NotTo(BeEmpty())
-					Expect(stagingResult.DetectedStartCommand).NotTo(BeEmpty())
+					Expect(stagingResult.ProcessTypes).NotTo(BeEmpty())
 
 					var executionMetadata protocol.ExecutionMetadata
 					err = json.Unmarshal([]byte(stagingResult.ExecutionMetadata), &executionMetadata)
@@ -413,10 +413,10 @@ var _ = Describe("Builder helpers", func() {
 					Expect(executionMetadata.Entrypoint).To(Equal(expectedEntryPoint))
 					Expect(executionMetadata.Workdir).To(Equal(metadata.ExecutionMetadata.Workdir))
 
-					Expect(stagingResult.DetectedStartCommand).To(HaveLen(1))
-					Expect(stagingResult.DetectedStartCommand).To(HaveKeyWithValue("web", expectedStartCmd))
+					Expect(stagingResult.ProcessTypes).To(HaveLen(1))
+					Expect(stagingResult.ProcessTypes).To(HaveKeyWithValue("web", expectedStartCmd))
 
-					Expect(stagingResult.DockerImage).To(Equal(metadata.DockerImage))
+					Expect(stagingResult.LifecycleMetadata.DockerImage).To(Equal(metadata.DockerImage))
 				}
 
 				It("should contain the metadata", func() {
