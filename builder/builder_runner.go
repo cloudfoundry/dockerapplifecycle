@@ -4,20 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
 	"time"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/nat"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/nu7hatch/gouuid"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/docker/nat"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/unix_transport"
+	"github.com/nu7hatch/gouuid"
 )
 
 type Builder struct {
+	RegistryURL                string
 	RepoName                   string
 	Tag                        string
 	InsecureDockerRegistries   []string
@@ -55,19 +56,24 @@ func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) err
 	return nil
 }
 
+type basicCredentialStore struct {
+	username string
+	password string
+}
+
+func (bcs basicCredentialStore) Basic(*url.URL) (string, string) {
+	return bcs.username, bcs.password
+}
+
 func (builder *Builder) build() <-chan error {
 	errorChan := make(chan error, 1)
 
 	go func() {
 		defer close(errorChan)
 
-		authConfig := &registry.AuthConfig{
-			Username:      builder.DockerUser,
-			Password:      builder.DockerPassword,
-			Email:         builder.DockerEmail,
-			ServerAddress: builder.DockerLoginServer,
-		}
-		img, err := helpers.FetchMetadata(builder.RepoName, builder.Tag, builder.InsecureDockerRegistries, authConfig)
+		credentials := basicCredentialStore{builder.DockerUser, builder.DockerPassword}
+
+		img, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, builder.InsecureDockerRegistries, credentials)
 		if err != nil {
 			errorChan <- fmt.Errorf(
 				"failed to fetch metadata from [%s] with tag [%s] and insecure registries %s due to %s",
@@ -236,7 +242,7 @@ func waitForDockerDaemon(giveUp <-chan struct{}) <-chan error {
 
 func pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
 	for {
-		resp, err := client.Get("unix:///var/run/docker.sock/_ping")
+		resp, err := client.Get("unix:///var/run/docker.sock/info")
 		if err != nil {
 			select {
 			case <-giveUp:

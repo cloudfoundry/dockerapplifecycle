@@ -9,12 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit/grouper"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/tedsuo/ifrit/sigmon"
-
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
 )
 
 type registries []string
@@ -25,12 +23,6 @@ func main() {
 	var dockerRegistryIPs ips
 
 	flagSet := flag.NewFlagSet("builder", flag.ExitOnError)
-
-	dockerImageURL := flagSet.String(
-		"dockerImageURL",
-		"",
-		"docker image uri in docker://[registry/][scope/]repository[#tag] format",
-	)
 
 	dockerRef := flagSet.String(
 		"dockerRef",
@@ -82,7 +74,7 @@ func main() {
 
 	dockerLoginServer := flagSet.String(
 		"dockerLoginServer",
-		registry.IndexServerAddress(),
+		helpers.DockerHubLoginServer,
 		"Docker Login server address",
 	)
 
@@ -109,25 +101,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	var repoName string
-	var tag string
-	if len(*dockerImageURL) > 0 {
-		parts, err := url.Parse(*dockerImageURL)
-		if err != nil {
-			println("invalid dockerImageURL: " + *dockerImageURL)
-			flagSet.PrintDefaults()
-			os.Exit(1)
-		}
-		repoName, tag = helpers.ParseDockerURL(parts)
-	} else if len(*dockerRef) > 0 {
-		repoName, tag = helpers.ParseDockerRef(*dockerRef)
+	var registryURL, repoName, tag string
+	if len(*dockerRef) > 0 {
+		registryURL, repoName, tag = helpers.ParseDockerRef(*dockerRef)
 	} else {
-		println("missing flag: dockerImageURL or dockerRef required")
+		println("missing flag: dockerRef required")
 		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 
 	builder := Builder{
+		RegistryURL:                registryURL,
 		RepoName:                   repoName,
 		Tag:                        tag,
 		OutputFilename:             *outputFilename,

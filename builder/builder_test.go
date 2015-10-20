@@ -10,20 +10,21 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"strconv"
 	"time"
 
-	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/ginkgo"
-	. "github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gbytes"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/gexec"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/onsi/gomega/ghttp"
+	"github.com/docker/libtrust"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/onsi/gomega/gexec"
+	"github.com/onsi/gomega/ghttp"
 )
 
 var _ = Describe("Building", func() {
 	var (
 		builderCmd                 *exec.Cmd
 		dockerRef                  string
-		dockerImageURL             string
 		insecureDockerRegistries   string
 		dockerRegistryIPs          string
 		dockerRegistryHost         string
@@ -39,6 +40,31 @@ var _ = Describe("Building", func() {
 		fakeDockerRegistry         *ghttp.Server
 	)
 
+	makeResponse := func(resp string) string {
+		payload := `{
+			"schemaVersion": 1,
+			"name": "cloudfoundry/diego-docker-app",
+			"tag": "latest",
+			"architecture": "amd64",
+			"fsLayers": [],
+			"history": [ { "v1Compatibility": ` + strconv.Quote(resp) + ` } ]
+		}`
+
+		key, err := libtrust.GenerateECP256PrivateKey()
+		Expect(err).NotTo(HaveOccurred())
+		jsonSignature, err := libtrust.NewJSONSignature([]byte(payload))
+		Expect(err).NotTo(HaveOccurred())
+		err = jsonSignature.Sign(key)
+		Expect(err).NotTo(HaveOccurred())
+		keys, err := jsonSignature.Verify()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(keys).To(HaveLen(1))
+
+		response, err := jsonSignature.PrettySignature("signatures")
+		Expect(err).NotTo(HaveOccurred())
+		return string(response)
+	}
+
 	setupBuilder := func() *gexec.Session {
 		session, err := gexec.Start(
 			builderCmd,
@@ -52,49 +78,26 @@ var _ = Describe("Building", func() {
 
 	setupFakeDockerRegistry := func() {
 		fakeDockerRegistry.AppendHandlers(
-			ghttp.VerifyRequest("GET", "/v1/_ping"),
-			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v1/repositories/some-repo/images"),
-				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Header().Set("X-Docker-Token", "token-1,token-2")
-					w.Write([]byte(`[
-                            {"id": "id-1", "checksum": "sha-1"},
-                            {"id": "id-2", "checksum": "sha-2"},
-                            {"id": "id-3", "checksum": "sha-3"}
-                        ]`))
-				}),
-			),
-		)
-
-		fakeDockerRegistry.AppendHandlers(
-			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v1/repositories/library/some-repo/tags"),
-				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Write([]byte(`{
-                            "latest": "id-1",
-                            "some-other-tag": "id-2"
-                        }`))
-				}),
-			),
+			ghttp.VerifyRequest("GET", "/v2/"),
 		)
 	}
 
 	setupRegistryResponse := func(response string) {
 		fakeDockerRegistry.AppendHandlers(
 			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
+				ghttp.VerifyRequest("GET", "/v2/some-repo/manifests/latest"),
 				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Header().Add("X-Docker-Size", "789")
+					response := makeResponse(response)
 					w.Write([]byte(response))
 				}),
 			),
 		)
 	}
 
-	buildDockerImageURL := func() string {
+	buildDockerRef := func() string {
 		parts, err := url.Parse(fakeDockerRegistry.URL())
 		Expect(err).NotTo(HaveOccurred())
-		return fmt.Sprintf("docker://%s/some-repo", parts.Host)
+		return fmt.Sprintf("%s/some-repo", parts.Host)
 	}
 
 	resultJSON := func() []byte {
@@ -108,7 +111,6 @@ var _ = Describe("Building", func() {
 		var err error
 
 		dockerRef = ""
-		dockerImageURL = ""
 		insecureDockerRegistries = ""
 		dockerRegistryIPs = ""
 		dockerRegistryHost = ""
@@ -135,9 +137,6 @@ var _ = Describe("Building", func() {
 	JustBeforeEach(func() {
 		args := []string{"-outputMetadataJSONFilename", outputMetadataJSONFilename}
 
-		if len(dockerImageURL) > 0 {
-			args = append(args, "-dockerImageURL", dockerImageURL)
-		}
 		if len(dockerRef) > 0 {
 			args = append(args, "-dockerRef", dockerRef)
 		}
@@ -181,7 +180,7 @@ var _ = Describe("Building", func() {
 		Context("with no docker image arg specified", func() {
 			It("should exit with an error", func() {
 				session := setupBuilder()
-				Eventually(session.Err).Should(gbytes.Say("missing flag: dockerImageURL or dockerRef required"))
+				Eventually(session.Err).Should(gbytes.Say("missing flag: dockerRef required"))
 				Eventually(session).Should(gexec.Exit(1))
 			})
 		})
@@ -201,7 +200,7 @@ var _ = Describe("Building", func() {
 					invalidRegistryAddress = "://10.244.2.6:5050"
 					insecureDockerRegistries = "10.244.2.7:8080, " + invalidRegistryAddress
 
-					dockerImageURL = buildDockerImageURL()
+					dockerRef = buildDockerRef()
 				})
 
 				It("should exit with an error", func() {
@@ -216,7 +215,7 @@ var _ = Describe("Building", func() {
 					invalidRegistryAddress = "10.244.2.6"
 					insecureDockerRegistries = invalidRegistryAddress + " , 10.244.2.7:8080"
 
-					dockerImageURL = buildDockerImageURL()
+					dockerRef = buildDockerRef()
 				})
 
 				It("should exit with an error", func() {
@@ -230,7 +229,7 @@ var _ = Describe("Building", func() {
 		Context("when docker daemon dir is invalid", func() {
 			BeforeEach(func() {
 				cacheDockerImage = true
-				dockerImageURL = buildDockerImageURL()
+				dockerRef = buildDockerRef()
 				dockerDaemonExecutablePath = "missing_dir/docker"
 
 				parts, err := url.Parse(fakeDockerRegistry.URL())
@@ -251,7 +250,7 @@ var _ = Describe("Building", func() {
 		Context("when docker registry host is invalid", func() {
 			BeforeEach(func() {
 				cacheDockerImage = true
-				dockerImageURL = buildDockerImageURL()
+				dockerRef = buildDockerRef()
 
 				parts, err := url.Parse(fakeDockerRegistry.URL())
 				Expect(err).NotTo(HaveOccurred())
@@ -295,7 +294,7 @@ var _ = Describe("Building", func() {
 		Context("when docker registry port is invalid", func() {
 			BeforeEach(func() {
 				cacheDockerImage = true
-				dockerImageURL = buildDockerImageURL()
+				dockerRef = buildDockerRef()
 
 				parts, err := url.Parse(fakeDockerRegistry.URL())
 				Expect(err).NotTo(HaveOccurred())
@@ -333,15 +332,7 @@ var _ = Describe("Building", func() {
 		testValid := func() {
 			BeforeEach(func() {
 				setupFakeDockerRegistry()
-				fakeDockerRegistry.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/v1/images/id-1/json"),
-						http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-							w.Header().Add("X-Docker-Size", "789")
-							w.Write([]byte(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`))
-						}),
-					),
-				)
+				setupRegistryResponse(`{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`)
 			})
 
 			It("should exit successfully", func() {
@@ -363,14 +354,6 @@ var _ = Describe("Building", func() {
 			})
 		}
 
-		dockerURLFunc := func() {
-			BeforeEach(func() {
-				dockerImageURL = buildDockerImageURL()
-			})
-
-			testValid()
-		}
-
 		dockerRefFunc := func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())
@@ -389,7 +372,6 @@ var _ = Describe("Building", func() {
 				dockerRegistryHost = "docker-registry.service.cf.internal"
 			})
 
-			Context("with a valid docker url", dockerURLFunc)
 			Context("with a valid docker ref", dockerRefFunc)
 		})
 
@@ -403,13 +385,11 @@ var _ = Describe("Building", func() {
 				dockerRegistryIPs = host + ",10.244.2.6"
 			})
 
-			Context("with a valid docker url", dockerURLFunc)
 			Context("with a valid docker ref", dockerRefFunc)
 		})
 
 		Context("without docker registries", func() {
 			Context("when there is no caching requested", func() {
-				Context("with a valid docker url", dockerURLFunc)
 				Context("with a valid docker ref", dockerRefFunc)
 			})
 
@@ -417,7 +397,7 @@ var _ = Describe("Building", func() {
 				var session *gexec.Session
 
 				BeforeEach(func() {
-					dockerImageURL = buildDockerImageURL()
+					dockerRef = buildDockerRef()
 					cacheDockerImage = true
 				})
 
@@ -511,7 +491,7 @@ var _ = Describe("Building", func() {
 
 		Context("with exposed ports in image metadata", func() {
 			BeforeEach(func() {
-				dockerImageURL = buildDockerImageURL()
+				dockerRef = buildDockerRef()
 				cacheDockerImage = false
 
 				setupFakeDockerRegistry()
@@ -575,7 +555,7 @@ var _ = Describe("Building", func() {
 
 		Context("with specified user in image metadata", func() {
 			BeforeEach(func() {
-				dockerImageURL = buildDockerImageURL()
+				dockerRef = buildDockerRef()
 				cacheDockerImage = false
 
 				setupFakeDockerRegistry()

@@ -1,96 +1,124 @@
 package helpers
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"net/url"
+	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
+	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/image"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/pkg/parsers"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/registry"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/Godeps/_workspace/src/github.com/docker/docker/utils"
+	"github.com/cloudfoundry-incubator/docker_app_lifecycle/docker/nat"
 	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
+	"github.com/docker/distribution/registry/client"
+	"github.com/docker/distribution/registry/client/auth"
+	"github.com/docker/distribution/registry/client/transport"
 )
 
-// For docker:// URLs
-func ParseDockerURL(parts *url.URL) (string, string) {
-	var tag string
-	if len(parts.Fragment) > 0 {
-		tag = parts.Fragment
-	} else {
-		tag = "latest"
-	}
+const (
+	DockerHubHostname    = "registry-1.docker.io"
+	DockerHubLoginServer = "https://index.docker.io/v1/"
+)
 
-	var repoName string
-	if len(parts.Host) == 0 {
-		repoName = strings.TrimPrefix(parts.Path, "/")
-	} else {
-		repoName = parts.Host + parts.Path
-	}
+type Config struct {
+	User         string
+	ExposedPorts map[nat.Port]struct{}
+	Cmd          []string
+	WorkingDir   string
+	Entrypoint   []string
+}
 
-	return repoName, tag
+type Image struct {
+	Config *Config `json:"config,omitempty"`
+}
+
+// borrowed from docker/docker
+func splitReposName(reposName string) (string, string) {
+	nameParts := strings.SplitN(reposName, "/", 2)
+	var hostname, repoName string
+	if len(nameParts) == 1 || (!strings.Contains(nameParts[0], ".") &&
+		!strings.Contains(nameParts[0], ":") && nameParts[0] != "localhost") {
+		// This is a Docker Index repos (ex: samalba/hipache or ubuntu)
+		// 'docker.io' in docker/docker codebase, but they use indices...
+		hostname = DockerHubHostname
+		repoName = reposName
+	} else {
+		hostname = nameParts[0]
+		repoName = nameParts[1]
+	}
+	return hostname, repoName
 }
 
 // For standard docker image references expressed as a protocol-less string
-func ParseDockerRef(dockerRef string) (string, string) {
-	repoName, tag := parsers.ParseRepositoryTag(dockerRef)
+// returns RegistryURL, repoName, tag|digest
+func ParseDockerRef(dockerRef string) (string, string, string) {
+	remote, tag := ParseRepositoryTag(dockerRef)
+	hostname, repoName := splitReposName(remote)
 
 	if len(tag) == 0 {
 		tag = "latest"
 	}
-
-	return repoName, tag
+	return hostname, repoName, tag
 }
 
-func FetchMetadata(repoName string, tag string, insecureRegistries []string, authConfig *registry.AuthConfig) (*image.Image, error) {
-	hostname, repoName, err := registry.ResolveRepositoryName(repoName)
+// stolen from docker/docker
+// Get a repos name and returns the right reposName + tag
+// The tag can be confusing because of a port in a repository name.
+//     Ex: localhost.localdomain:5000/samalba/hipache:latest
+func ParseRepositoryTag(repos string) (string, string) {
+	n := strings.LastIndex(repos, ":")
+	if n < 0 {
+		return repos, ""
+	}
+	if tag := repos[n+1:]; !strings.Contains(tag, "/") {
+		return repos[:n], tag
+	}
+	return repos, ""
+}
+
+func FetchMetadata(registryURL string, repoName string, tag string, insecureRegistries []string, credentials auth.CredentialStore) (*Image, error) {
+	scheme := "https"
+	transport, err := makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials)
 	if err != nil {
-		return nil, err
-	}
-
-	endpoint, err := registry.NewEndpoint(hostname, insecureRegistries)
-	if err != nil {
-		return nil, err
-	}
-
-	session, err := registry.NewSession(authConfig, utils.NewHTTPRequestFactory(), endpoint, true)
-	if err != nil {
-		return nil, err
-	}
-
-	repoData, err := session.GetRepositoryData(repoName)
-	if err != nil {
-		return nil, err
-	}
-
-	tagsList, err := session.GetRemoteTags(repoData.Endpoints, repoName, repoData.Tokens)
-	if err != nil {
-		return nil, err
-	}
-
-	imgID, ok := tagsList[tag]
-	if !ok {
-		return nil, fmt.Errorf("unknown tag: %s:%s", repoName, tag)
-	}
-
-	errors := make([]string, 0)
-	for _, endpoint := range repoData.Endpoints {
-		imgJSON, _, err := session.GetRemoteImageJSON(imgID, endpoint, repoData.Tokens)
-		if err == nil {
-			img, parseErr := image.NewImgJSON(imgJSON)
-			if parseErr != nil {
-				return nil, parseErr
-			}
-			return img, nil
+		scheme = "http"
+		transport, err = makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials)
+		if err != nil {
+			return nil, err
 		}
-		errors = append(errors, endpoint+": "+err.Error())
 	}
 
-	return nil, fmt.Errorf("all endpoints failed: [%s]", strings.Join(errors, ", "))
+	repoClient, err := client.NewRepository(context.TODO(), repoName, scheme+"://"+registryURL, transport)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed making docker repository client:", err)
+		return nil, err
+	}
+
+	manifestService, err := repoClient.Manifests(context.TODO())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed getting docker image manifests:", err)
+		return nil, err
+	}
+
+	manifest, err := manifestService.GetByTag(tag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed getting docker image by tag:", err)
+		return nil, err
+	}
+
+	var image Image
+	err = json.Unmarshal([]byte(manifest.History[0].V1Compatibility), &image)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed parsing docker image JSON:", err)
+		return nil, err
+	}
+
+	return &image, nil
 }
 
 func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error {
@@ -130,4 +158,63 @@ func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error
 	}
 
 	return nil
+}
+
+func makeTransport(scheme, registryURL, repository string, insecureRegistries []string, credentialStore auth.CredentialStore) (http.RoundTripper, error) {
+	baseTransport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).Dial,
+		DisableKeepAlives: true,
+	}
+
+	if scheme == "https" {
+		secure := true
+		for _, insecureRegistry := range insecureRegistries {
+			if registryURL == insecureRegistry {
+				secure = false
+				break
+			}
+		}
+
+		if !secure {
+			baseTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		}
+	}
+
+	authTransport := transport.NewTransport(baseTransport)
+
+	pingClient := &http.Client{
+		Transport: authTransport,
+		Timeout:   5 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", scheme+"://"+registryURL+"/v2/", nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to talk to docker registry:", err)
+		return nil, err
+	}
+	challengeManager := auth.NewSimpleChallengeManager()
+
+	resp, err := pingClient.Do(req)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to talk to docker registry:", err)
+		return nil, err
+	} else {
+		defer resp.Body.Close()
+
+		if err := challengeManager.AddResponse(resp); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to talk to docker registry:", err)
+			return nil, err
+		}
+	}
+
+	tokenHandler := auth.NewTokenHandler(authTransport, credentialStore, repository, "pull")
+	basicHandler := auth.NewBasicHandler(credentialStore)
+	authorizer := auth.NewAuthorizer(challengeManager, tokenHandler, basicHandler)
+
+	return transport.NewTransport(baseTransport, authorizer), nil
 }

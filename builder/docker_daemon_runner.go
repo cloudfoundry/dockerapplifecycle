@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var DockerArgs []string = []string{"--daemon=true", "--iptables=false", "--ipv6=false", `--log-level="error"`}
+var DockerArgs []string = []string{"daemon", "--log-level=error", "--iptables=false", "--ipv6=false"}
 
 type DockerDaemon struct {
 	DockerDaemonPath         string
