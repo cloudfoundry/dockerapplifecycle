@@ -102,6 +102,9 @@ func (builder *Builder) build() <-chan error {
 		}
 
 		dockerImageURL := builder.RepoName
+		if builder.RegistryURL != helpers.DockerHubHostname {
+			dockerImageURL = builder.RegistryURL + "/" + dockerImageURL
+		}
 		if len(builder.Tag) > 0 {
 			dockerImageURL = dockerImageURL + ":" + builder.Tag
 		}
@@ -114,7 +117,6 @@ func (builder *Builder) build() <-chan error {
 				errorChan <- err
 				return
 			}
-
 		}
 
 		if err := helpers.SaveMetadata(builder.OutputFilename, &info); err != nil {
