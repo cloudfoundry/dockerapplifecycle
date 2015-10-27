@@ -72,6 +72,12 @@ func main() {
 		"Docker Registry port",
 	)
 
+	dockerRegistryRequireTLS := flagSet.Bool(
+		"dockerRegistryRequireTLS",
+		false,
+		"Use HTTPS when contacting the Docker Registry",
+	)
+
 	dockerLoginServer := flagSet.String(
 		"dockerLoginServer",
 		helpers.DockerHubLoginServer,
@@ -110,28 +116,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	builder := Builder{
-		RegistryURL:                registryURL,
-		RepoName:                   repoName,
-		Tag:                        tag,
-		OutputFilename:             *outputFilename,
-		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
-		InsecureDockerRegistries:   insecureDockerRegistries,
-		DockerDaemonTimeout:        10 * time.Second,
-		CacheDockerImage:           *cacheDockerImage,
-		DockerRegistryIPs:          dockerRegistryIPs,
-		DockerRegistryHost:         *dockerRegistryHost,
-		DockerRegistryPort:         *dockerRegistryPort,
-		DockerLoginServer:          *dockerLoginServer,
-		DockerUser:                 *dockerUser,
-		DockerPassword:             *dockerPassword,
-		DockerEmail:                *dockerEmail,
-	}
-
-	members := grouper.Members{
-		{"builder", ifrit.RunFunc(builder.Run)},
-	}
-
 	if *cacheDockerImage {
 		if len(dockerRegistryIPs) == 0 {
 			println("missing flag: dockerRegistryIPs required")
@@ -153,7 +137,35 @@ func main() {
 			println("port number too big", *dockerRegistryPort)
 			os.Exit(1)
 		}
+		if !*dockerRegistryRequireTLS {
+			insecureDockerRegistries = append(insecureDockerRegistries, fmt.Sprintf("%s:%d", *dockerRegistryHost, *dockerRegistryPort))
+		}
+	}
 
+	builder := Builder{
+		RegistryURL:                registryURL,
+		RepoName:                   repoName,
+		Tag:                        tag,
+		OutputFilename:             *outputFilename,
+		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
+		InsecureDockerRegistries:   insecureDockerRegistries,
+		DockerDaemonTimeout:        10 * time.Second,
+		CacheDockerImage:           *cacheDockerImage,
+		DockerRegistryIPs:          dockerRegistryIPs,
+		DockerRegistryHost:         *dockerRegistryHost,
+		DockerRegistryPort:         *dockerRegistryPort,
+		DockerRegistryRequireTLS:   *dockerRegistryRequireTLS,
+		DockerLoginServer:          *dockerLoginServer,
+		DockerUser:                 *dockerUser,
+		DockerPassword:             *dockerPassword,
+		DockerEmail:                *dockerEmail,
+	}
+
+	members := grouper.Members{
+		{"builder", ifrit.RunFunc(builder.Run)},
+	}
+
+	if *cacheDockerImage {
 		validateCredentials(*dockerLoginServer, *dockerUser, *dockerPassword, *dockerEmail)
 
 		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {

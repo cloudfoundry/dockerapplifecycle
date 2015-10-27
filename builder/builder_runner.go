@@ -29,6 +29,7 @@ type Builder struct {
 	DockerRegistryIPs          []string
 	DockerRegistryHost         string
 	DockerRegistryPort         int
+	DockerRegistryRequireTLS   bool
 	DockerLoginServer          string
 	DockerUser                 string
 	DockerPassword             string

@@ -194,7 +194,6 @@ func makeTransport(scheme, registryURL, repository string, insecureRegistries []
 
 	req, err := http.NewRequest("GET", scheme+"://"+registryURL+"/v2/", nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to talk to docker registry:", err)
 		return nil, err
 	}
 	challengeManager := auth.NewSimpleChallengeManager()
