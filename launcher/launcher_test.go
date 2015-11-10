@@ -76,7 +76,7 @@ var _ = Describe("Launcher", func() {
 		})
 
 		It("munges VCAP_APPLICATION appropriately", func() {
-			Eventually(session).Should(gexec.Exit(0))
+			Eventually(session, 3, "100ms").Should(gexec.Exit(0))
 
 			vcapAppPattern := regexp.MustCompile("VCAP_APPLICATION=(.*)")
 			vcapApplicationBytes := vcapAppPattern.FindSubmatch(session.Out.Contents())[1]

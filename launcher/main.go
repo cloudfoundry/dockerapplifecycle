@@ -82,7 +82,7 @@ func main() {
 		ecmd := exec.Command(argv[0], argv[1:]...)
 		ecmd.Stdout = os.Stdout
 		ecmd.Stderr = os.Stderr
-		err = ecmd.Start()
+		err = ecmd.Run()
 	}
 
 	if err != nil {
