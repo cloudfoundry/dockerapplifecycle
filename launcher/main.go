@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -62,7 +63,7 @@ func main() {
 	os.Chdir(workdir)
 
 	if startCommand != "" {
-		syscall.Exec("/bin/sh", []string{
+		err = syscall.Exec("/bin/sh", []string{
 			"/bin/sh",
 			"-c",
 			startCommand,
@@ -78,6 +79,14 @@ func main() {
 		// and Cmd are treated by docker; we follow these rules here
 		argv := executionMetadata.Entrypoint
 		argv = append(argv, executionMetadata.Cmd...)
-		syscall.Exec(argv[0], argv, os.Environ())
+		ecmd := exec.Command(argv[0], argv[1:]...)
+		ecmd.Stdout = os.Stdout
+		ecmd.Stderr = os.Stderr
+		err = ecmd.Start()
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to run: %s", err)
+		os.Exit(1)
 	}
 }
