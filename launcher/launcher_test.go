@@ -235,4 +235,19 @@ var _ = Describe("Launcher", func() {
 			Eventually(session).Should(gexec.Exit(1))
 		})
 	})
+
+	Context("when no start command is given, and exec fails", func() {
+		BeforeEach(func() {
+			launcherCmd.Args = []string{
+				"launcher",
+				appDir,
+				"",
+				`{ "cmd": ["/bin/sh", "-c", "exit 9"] }`,
+			}
+		})
+
+		It("correctly bubbles non-zero exit codes", func() {
+			Eventually(session).Should(gexec.Exit(9))
+		})
+	})
 })

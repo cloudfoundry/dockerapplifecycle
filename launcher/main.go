@@ -62,29 +62,27 @@ func main() {
 	}
 	os.Chdir(workdir)
 
-	if startCommand != "" {
-		err = syscall.Exec("/bin/sh", []string{
-			"/bin/sh",
-			"-c",
-			startCommand,
-		}, os.Environ())
-	} else {
-		if len(executionMetadata.Entrypoint) == 0 && len(executionMetadata.Cmd) == 0 {
-			fmt.Fprintf(os.Stderr, "No start command found or specified")
-			os.Exit(1)
-		}
-
-		// https://docs.docker.com/reference/builder/#entrypoint and
-		// https://docs.docker.com/reference/builder/#cmd dictate how Entrypoint
-		// and Cmd are treated by docker; we follow these rules here
-		argv := executionMetadata.Entrypoint
-		argv = append(argv, executionMetadata.Cmd...)
-		ecmd := exec.Command(argv[0], argv[1:]...)
-		ecmd.Stdout = os.Stdout
-		ecmd.Stderr = os.Stderr
-		err = ecmd.Run()
+	if len(executionMetadata.Entrypoint) == 0 && len(executionMetadata.Cmd) == 0 && startCommand == "" {
+		fmt.Fprintf(os.Stderr, "No start command found or specified")
+		os.Exit(1)
 	}
 
+	// https://docs.docker.com/reference/builder/#entrypoint and
+	// https://docs.docker.com/reference/builder/#cmd dictate how Entrypoint
+	// and Cmd are treated by docker; we follow these rules here
+	var argv []string
+	if startCommand != "" {
+		argv = []string{"/bin/sh", "-c", startCommand}
+	} else {
+		argv = append(executionMetadata.Entrypoint, executionMetadata.Cmd...)
+		argv[0], err = exec.LookPath(argv[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to resolve path: %s", err)
+			os.Exit(1)
+		}
+	}
+
+	err = syscall.Exec(argv[0], argv, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to run: %s", err)
 		os.Exit(1)
