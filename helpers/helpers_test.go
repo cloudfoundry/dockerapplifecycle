@@ -165,48 +165,38 @@ var _ = Describe("Builder helpers", func() {
 	}
 
 	Describe("ParseDockerRef", func() {
-		It("should return a repo and tag", func() {
-			repositoryURL, repoName, tag := helpers.ParseDockerRef("foobar:5123/baz/bot:test")
-			Expect(repositoryURL).To(Equal("foobar:5123"))
-			Expect(repoName).To(Equal("baz/bot"))
-			Expect(tag).To(Equal("test"))
+		Context("when the repo image is from dockerhub", func() {
+			It("prepends 'library/' to the repo Name if there is no '/' character", func() {
+				repositoryURL, repoName, _ := helpers.ParseDockerRef("redis")
+				Expect(repositoryURL).To(Equal("registry-1.docker.io"))
+				Expect(repoName).To(Equal("library/redis"))
+			})
 
-			repositoryURL, repoName, tag = helpers.ParseDockerRef("baz/bot:test")
-			Expect(repositoryURL).To(Equal("registry-1.docker.io"))
-			Expect(repoName).To(Equal("baz/bot"))
-			Expect(tag).To(Equal("test"))
-
-			repositoryURL, repoName, tag = helpers.ParseDockerRef("bot:test")
-			Expect(repositoryURL).To(Equal("registry-1.docker.io"))
-			Expect(repoName).To(Equal("bot"))
-			Expect(tag).To(Equal("test"))
-
-			repositoryURL, repoName, tag = helpers.ParseDockerRef("xyz:123")
-			Expect(repositoryURL).To(Equal("registry-1.docker.io"))
-			Expect(repoName).To(Equal("xyz"))
-			Expect(tag).To(Equal("123"))
-
-			repositoryURL, repoName, tag = helpers.ParseDockerRef("a:123/b/c:456")
-			Expect(repositoryURL).To(Equal("a:123"))
-			Expect(repoName).To(Equal("b/c"))
-			Expect(tag).To(Equal("456"))
+			It("does not prepends 'library/' to the repo Name if there is a '/' ", func() {
+				repositoryURL, repoName, _ := helpers.ParseDockerRef("b/c")
+				Expect(repositoryURL).To(Equal("registry-1.docker.io"))
+				Expect(repoName).To(Equal("b/c"))
+			})
 		})
 
-		It("should default to the latest tag", func() {
-			repositoryURL, repoName, tag := helpers.ParseDockerRef("a/b/c")
-			Expect(repositoryURL).To(Equal("registry-1.docker.io"))
-			Expect(repoName).To(Equal("a/b/c"))
-			Expect(tag).To(Equal("latest"))
+		Context("When the registryURL is not dockerhub", func() {
+			It("does not add a '/' character to a single repo name", func() {
+				repositoryURL, repoName, _ := helpers.ParseDockerRef("foobar:5123/baz")
+				Expect(repositoryURL).To(Equal("foobar:5123"))
+				Expect(repoName).To(Equal("baz"))
+			})
+		})
 
-			repositoryURL, repoName, tag = helpers.ParseDockerRef("foobar:5123/baz/bot")
-			Expect(repositoryURL).To(Equal("foobar:5123"))
-			Expect(repoName).To(Equal("baz/bot"))
-			Expect(tag).To(Equal("latest"))
+		Context("Parsing tags", func() {
+			It("should parse tags based off the last colon", func() {
+				_, _, tag := helpers.ParseDockerRef("baz/bot:test")
+				Expect(tag).To(Equal("test"))
+			})
 
-			repositoryURL, repoName, tag = helpers.ParseDockerRef("baz/bot")
-			Expect(repositoryURL).To(Equal("registry-1.docker.io"))
-			Expect(repoName).To(Equal("baz/bot"))
-			Expect(tag).To(Equal("latest"))
+			It("should default the tag to latest", func() {
+				_, _, tag := helpers.ParseDockerRef("redis")
+				Expect(tag).To(Equal("latest"))
+			})
 		})
 	})
 

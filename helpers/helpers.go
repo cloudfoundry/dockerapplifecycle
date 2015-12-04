@@ -61,6 +61,10 @@ func ParseDockerRef(dockerRef string) (string, string, string) {
 	remote, tag := ParseRepositoryTag(dockerRef)
 	hostname, repoName := splitReposName(remote)
 
+	if hostname == DockerHubHostname && !strings.Contains(repoName, "/") {
+		repoName = "library/" + repoName
+	}
+
 	if len(tag) == 0 {
 		tag = "latest"
 	}
