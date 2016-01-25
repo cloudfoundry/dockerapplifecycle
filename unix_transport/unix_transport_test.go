@@ -161,7 +161,10 @@ var _ = Describe("Unix transport", func() {
 		It("errors", func() {
 			_, err := client.Get("unix:///not/existing.sock/_ping")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("dial unix %s: connect: no such file or directory", socket)))
+			Expect(err.Error()).To(Or(
+				ContainSubstring(fmt.Sprintf("dial unix %s: connect: no such file or directory", socket)),
+				ContainSubstring(fmt.Sprintf("dial unix %s: no such file or directory", socket)),
+			))
 		})
 	})
 })
