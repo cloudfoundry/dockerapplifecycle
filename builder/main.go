@@ -48,6 +48,12 @@ func main() {
 		"path to the 'docker' executable",
 	)
 
+	dockerDaemonUnixSocket := flagSet.String(
+		"dockerDaemonUnixSocket",
+		"/var/run/docker.sock/info",
+		"path to the unix socket the docker daemon is listening to",
+	)
+
 	cacheDockerImage := flagSet.Bool(
 		"cacheDockerImage",
 		false,
@@ -150,6 +156,7 @@ func main() {
 		DockerDaemonExecutablePath: *dockerDaemonExecutablePath,
 		InsecureDockerRegistries:   insecureDockerRegistries,
 		DockerDaemonTimeout:        10 * time.Second,
+		DockerDaemonUnixSocket:     *dockerDaemonUnixSocket,
 		CacheDockerImage:           *cacheDockerImage,
 		DockerRegistryIPs:          dockerRegistryIPs,
 		DockerRegistryHost:         *dockerRegistryHost,

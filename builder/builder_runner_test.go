@@ -3,6 +3,8 @@ package main_test
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -18,18 +20,22 @@ import (
 var _ = Describe("Builder runner", func() {
 	var (
 		lifecycle        ifrit.Process
+		builder          main.Builder
 		fakeDeamonRunner func(signals <-chan os.Signal, ready chan<- struct{}) error
 	)
 
 	BeforeEach(func() {
-		builder := main.Builder{
-			RepoName:            "ubuntu",
-			Tag:                 "latest",
-			OutputFilename:      "/tmp/result/result.json",
-			DockerDaemonTimeout: 300 * time.Millisecond,
-			CacheDockerImage:    true,
+		builder = main.Builder{
+			RepoName:               "ubuntu",
+			Tag:                    "latest",
+			OutputFilename:         "/tmp/result/result.json",
+			DockerDaemonTimeout:    300 * time.Millisecond,
+			CacheDockerImage:       true,
+			DockerDaemonUnixSocket: "/tmp/daemon_unix_socket",
 		}
+	})
 
+	JustBeforeEach(func() {
 		lifecycle = ifrit.Background(grouper.NewParallel(os.Interrupt, grouper.Members{
 			{"builder", ifrit.RunFunc(builder.Run)},
 			{"fake_docker_daemon", ifrit.RunFunc(fakeDeamonRunner)},
@@ -69,6 +75,45 @@ var _ = Describe("Builder runner", func() {
 				Expect(err.Error()).To(ContainSubstring("fake_docker_daemon exited with error: interrupt"))
 				Expect(err.Error()).To(ContainSubstring("builder exited with error: interrupt"))
 			})
+		})
+	})
+
+	Context("when the daemon starts", func() {
+		requestAddr := make(chan string, 1)
+		var listener net.Listener
+
+		BeforeEach(func() {
+			var err error
+			listener, err = net.Listen("unix", builder.DockerDaemonUnixSocket)
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
+				close(ready)
+
+				go func() {
+					defer GinkgoRecover()
+					srvr := &http.Server{
+						Handler: http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+							requestAddr <- request.RequestURI
+						}),
+						ReadTimeout:  time.Second,
+						WriteTimeout: time.Second,
+					}
+					srvr.Serve(listener)
+				}()
+
+				return nil
+			}
+		})
+
+		AfterEach(func() {
+			Expect(listener.Close()).To(Succeed())
+		})
+
+		It("sends a ping request to the daemon", func() {
+			var address string
+			Eventually(requestAddr).Should(Receive(&address))
+			Expect(address).To(Equal("/info"))
 		})
 	})
 

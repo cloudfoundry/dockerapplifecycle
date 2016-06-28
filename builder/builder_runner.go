@@ -24,6 +24,7 @@ type Builder struct {
 	InsecureDockerRegistries   []string
 	OutputFilename             string
 	DockerDaemonExecutablePath string
+	DockerDaemonUnixSocket     string
 	DockerDaemonTimeout        time.Duration
 	CacheDockerImage           bool
 	DockerRegistryIPs          []string
@@ -38,7 +39,11 @@ type Builder struct {
 
 func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	if builder.CacheDockerImage {
-		err := waitForDocker(signals, builder.DockerDaemonTimeout)
+		if builder.DockerDaemonUnixSocket == "" {
+			builder.DockerDaemonExecutablePath = "/var/run/docker.sock/info"
+		}
+
+		err := builder.waitForDocker(signals)
 		if err != nil {
 			return err
 		}
@@ -216,16 +221,16 @@ func (builder *Builder) GenerateImageName() (string, error) {
 	return fmt.Sprintf("%s:%d/%s", builder.DockerRegistryHost, builder.DockerRegistryPort, uuid), nil
 }
 
-func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
+func (builder *Builder) waitForDocker(signals <-chan os.Signal) error {
 	giveUp := make(chan struct{})
 	defer close(giveUp)
 
 	select {
-	case err := <-waitForDockerDaemon(giveUp):
+	case err := <-builder.waitForDockerDaemon(giveUp):
 		if err != nil {
 			return err
 		}
-	case <-time.After(timeout):
+	case <-time.After(builder.DockerDaemonTimeout):
 		return errors.New("Timed out waiting for docker daemon to start")
 	case signal := <-signals:
 		return errors.New(signal.String())
@@ -234,18 +239,18 @@ func waitForDocker(signals <-chan os.Signal, timeout time.Duration) error {
 	return nil
 }
 
-func waitForDockerDaemon(giveUp <-chan struct{}) <-chan error {
+func (builder *Builder) waitForDockerDaemon(giveUp <-chan struct{}) <-chan error {
 	errChan := make(chan error, 1)
-	client := http.Client{Transport: unix_transport.New("/var/run/docker.sock")}
+	client := http.Client{Transport: unix_transport.New(builder.DockerDaemonUnixSocket)}
 
-	go pingDaemonPeriodically(client, errChan, giveUp)
+	go builder.pingDaemonPeriodically(client, errChan, giveUp)
 
 	return errChan
 }
 
-func pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
+func (builder *Builder) pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
 	for {
-		resp, err := client.Get("unix:///var/run/docker.sock/info")
+		resp, err := client.Get("unix://" + builder.DockerDaemonUnixSocket + "/info")
 		if err != nil {
 			select {
 			case <-giveUp:
