@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/docker/nat"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/unix_transport"
+	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
+	"code.cloudfoundry.org/dockerapplifecycle/helpers"
+	"code.cloudfoundry.org/dockerapplifecycle/protocol"
+	"code.cloudfoundry.org/dockerapplifecycle/unix_transport"
 	"github.com/nu7hatch/gouuid"
 )
 

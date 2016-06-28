@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
+	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 )
 
 func main() {

@@ -13,9 +13,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/docker/nat"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
+	"code.cloudfoundry.org/dockerapplifecycle"
+	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
+	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 	"github.com/docker/distribution/registry/client"
 	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/distribution/registry/client/transport"
@@ -148,11 +148,11 @@ func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error
 		startCommand = strings.Join([]string{strings.Join(metadata.ExecutionMetadata.Entrypoint, " "), startCommand}, " ")
 	}
 
-	err = json.NewEncoder(resultFile).Encode(docker_app_lifecycle.NewStagingResult(
-		docker_app_lifecycle.ProcessTypes{
+	err = json.NewEncoder(resultFile).Encode(dockerapplifecycle.NewStagingResult(
+		dockerapplifecycle.ProcessTypes{
 			"web": startCommand,
 		},
-		docker_app_lifecycle.LifecycleMetadata{
+		dockerapplifecycle.LifecycleMetadata{
 			DockerImage: metadata.DockerImage,
 		},
 		string(executionMetadataJSON),

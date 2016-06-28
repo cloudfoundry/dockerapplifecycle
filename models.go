@@ -1,4 +1,4 @@
-package docker_app_lifecycle
+package dockerapplifecycle
 
 type ProcessTypes map[string]string
 

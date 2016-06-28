@@ -8,10 +8,10 @@ import (
 	"os"
 	"path"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/docker/nat"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/helpers"
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/protocol"
+	"code.cloudfoundry.org/dockerapplifecycle"
+	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
+	"code.cloudfoundry.org/dockerapplifecycle/helpers"
+	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -399,7 +399,7 @@ var _ = Describe("Builder helpers", func() {
 					Expect(err).NotTo(HaveOccurred())
 					result := resultJSON(path.Join(outputDir, "result.json"))
 
-					var stagingResult docker_app_lifecycle.StagingResult
+					var stagingResult dockerapplifecycle.StagingResult
 					err = json.Unmarshal(result, &stagingResult)
 					Expect(err).NotTo(HaveOccurred())
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-incubator/docker_app_lifecycle/builder"
+	"code.cloudfoundry.org/dockerapplifecycle/builder"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/tedsuo/ifrit"
