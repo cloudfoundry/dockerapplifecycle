@@ -65,7 +65,7 @@ var _ = Describe("Builder runner", func() {
 		})
 
 		Context("and the process is interrupted", func() {
-			BeforeEach(func() {
+			JustBeforeEach(func() {
 				lifecycle.Signal(os.Interrupt)
 			})
 
