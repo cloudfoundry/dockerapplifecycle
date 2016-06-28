@@ -1,4 +1,6 @@
-# docker_app_lifecycle
+# dockerapplifecycle
+
+**Note**: This repository should be imported as `code.cloudfoundry.org/dockerapplifecycle`.
 
 The docker app lifecycle implements a Docker deployment strategy for Cloud
 Foundry on Diego.
