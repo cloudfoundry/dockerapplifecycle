@@ -71,7 +71,7 @@ func (bcs basicCredentialStore) Basic(*url.URL) (string, string) {
 	return bcs.username, bcs.password
 }
 
-func (builder *Builder) build() <-chan error {
+func (builder Builder) build() <-chan error {
 	errorChan := make(chan error, 1)
 
 	go func() {
@@ -248,7 +248,7 @@ func (builder *Builder) waitForDockerDaemon(giveUp <-chan struct{}) <-chan error
 	return errChan
 }
 
-func (builder *Builder) pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
+func (builder Builder) pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
 	for {
 		resp, err := client.Get("unix://" + builder.DockerDaemonUnixSocket + "/info")
 		if err != nil {
