@@ -3,6 +3,7 @@ package main_test
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -20,18 +21,25 @@ import (
 var _ = Describe("Builder runner", func() {
 	var (
 		lifecycle        ifrit.Process
-		builder          main.Builder
+		builder          *main.Builder
 		fakeDeamonRunner func(signals <-chan os.Signal, ready chan<- struct{}) error
 	)
 
 	BeforeEach(func() {
-		builder = main.Builder{
+		// create a temporary file name to be used for the unix socket
+		unixSocket, err := ioutil.TempFile(os.TempDir(), "")
+		Expect(err).NotTo(HaveOccurred())
+		// close the file so we don't get a "bind: address already in use" error
+		unixSocket.Close()
+		os.Remove(unixSocket.Name())
+
+		builder = &main.Builder{
 			RepoName:               "ubuntu",
 			Tag:                    "latest",
 			OutputFilename:         "/tmp/result/result.json",
 			DockerDaemonTimeout:    300 * time.Millisecond,
 			CacheDockerImage:       true,
-			DockerDaemonUnixSocket: "/tmp/daemon_unix_socket",
+			DockerDaemonUnixSocket: unixSocket.Name(),
 		}
 	})
 
@@ -111,9 +119,7 @@ var _ = Describe("Builder runner", func() {
 		})
 
 		It("sends a ping request to the daemon", func() {
-			var address string
-			Eventually(requestAddr).Should(Receive(&address))
-			Expect(address).To(Equal("/info"))
+			Eventually(requestAddr).Should(Receive(Equal("/info")))
 		})
 	})
 
