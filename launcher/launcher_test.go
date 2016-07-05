@@ -58,14 +58,6 @@ var _ = Describe("Launcher", func() {
 			Eventually(session).Should(gbytes.Say("running app"))
 		})
 
-		It("executes the start command with $HOME as the given dir", func() {
-			Eventually(session).Should(gbytes.Say("HOME=" + appDir))
-		})
-
-		It("executes the start command with $TMPDIR as the given dir + /tmp", func() {
-			Eventually(session).Should(gbytes.Say("TMPDIR=" + appDir + "/tmp"))
-		})
-
 		It("executes with the environment of the caller", func() {
 			Eventually(session).Should(gbytes.Say("CALLERENV=some-value"))
 		})
@@ -182,7 +174,7 @@ var _ = Describe("Launcher", func() {
 
 	ItPrintsUsageInformation := func() {
 		It("prints usage information", func() {
-			Eventually(session.Err).Should(gbytes.Say("Usage: launcher <app directory> <start command> <metadata>"))
+			Eventually(session.Err).Should(gbytes.Say("Usage: launcher <ignored> <start command> <metadata>"))
 			Eventually(session).Should(gexec.Exit(1))
 		})
 	}

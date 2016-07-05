@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"syscall"
 
@@ -14,16 +13,13 @@ import (
 
 func main() {
 	if len(os.Args) < 4 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <app directory> <start command> <metadata>", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <ignored> <start command> <metadata>", os.Args[0])
 		os.Exit(1)
 	}
 
-	dir := os.Args[1]
+	// os.Args[1] is ignored, but left for backwards compatibility
 	startCommand := os.Args[2]
 	metadata := os.Args[3]
-
-	os.Setenv("HOME", dir)
-	os.Setenv("TMPDIR", filepath.Join(dir, "tmp"))
 
 	vcapAppEnv := map[string]interface{}{}
 
