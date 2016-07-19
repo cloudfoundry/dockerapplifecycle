@@ -55,16 +55,18 @@ var _ = Describe("Builder runner", func() {
 	})
 
 	Context("when the daemon won't start", func() {
-		fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
-			close(ready)
-			select {
-			case signal := <-signals:
-				return errors.New(signal.String())
-			case <-time.After(1 * time.Second):
-				// Daemon "crashes" after a while
+		BeforeEach(func() {
+			fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
+				close(ready)
+				select {
+				case signal := <-signals:
+					return errors.New(signal.String())
+				case <-time.After(1 * time.Second):
+					// Daemon "crashes" after a while
+				}
+				return nil
 			}
-			return nil
-		}
+		})
 
 		It("times out", func() {
 			err := <-lifecycle.Wait()
