@@ -33,6 +33,8 @@ var _ = Describe("Builder runner", func() {
 		unixSocket.Close()
 		os.Remove(unixSocket.Name())
 
+		fakeDeamonRunner = nil
+
 		builder = &main.Builder{
 			RepoName:               "ubuntu",
 			Tag:                    "latest",
@@ -43,85 +45,87 @@ var _ = Describe("Builder runner", func() {
 		}
 	})
 
-	JustBeforeEach(func() {
-		lifecycle = ifrit.Background(grouper.NewParallel(os.Interrupt, grouper.Members{
-			{"builder", ifrit.RunFunc(builder.Run)},
-			{"fake_docker_daemon", ifrit.RunFunc(fakeDeamonRunner)},
-		}))
-	})
-
-	AfterEach(func() {
-		ginkgomon.Interrupt(lifecycle)
-	})
-
-	Context("when the daemon won't start", func() {
-		BeforeEach(func() {
-			fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
-				close(ready)
-				select {
-				case signal := <-signals:
-					return errors.New(signal.String())
-				case <-time.After(1 * time.Second):
-					// Daemon "crashes" after a while
-				}
-				return nil
-			}
-		})
-
-		It("times out", func() {
-			err := <-lifecycle.Wait()
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("Timed out waiting for docker daemon to start"))
-		})
-
-		Context("and the process is interrupted", func() {
-			JustBeforeEach(func() {
-				lifecycle.Signal(os.Interrupt)
-			})
-
-			It("exists with error", func() {
-				err := <-lifecycle.Wait()
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("fake_docker_daemon exited with error: interrupt"))
-				Expect(err.Error()).To(ContainSubstring("builder exited with error: interrupt"))
-			})
-		})
-	})
-
-	Context("when the daemon starts", func() {
-		requestAddr := make(chan string, 1)
-		var listener net.Listener
-
-		BeforeEach(func() {
-			var err error
-			listener, err = net.Listen("unix", builder.DockerDaemonUnixSocket)
-			Expect(err).NotTo(HaveOccurred())
-
-			fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
-				close(ready)
-
-				go func() {
-					defer GinkgoRecover()
-					srvr := &http.Server{
-						Handler: http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-							requestAddr <- request.RequestURI
-						}),
-						ReadTimeout:  time.Second,
-						WriteTimeout: time.Second,
-					}
-					srvr.Serve(listener)
-				}()
-
-				return nil
-			}
+	Context("when a docker daemon runs", func() {
+		JustBeforeEach(func() {
+			lifecycle = ifrit.Background(grouper.NewParallel(os.Interrupt, grouper.Members{
+				{"builder", ifrit.RunFunc(builder.Run)},
+				{"fake_docker_daemon", ifrit.RunFunc(fakeDeamonRunner)},
+			}))
 		})
 
 		AfterEach(func() {
-			Expect(listener.Close()).To(Succeed())
+			ginkgomon.Interrupt(lifecycle)
 		})
 
-		It("sends a ping request to the daemon", func() {
-			Eventually(requestAddr).Should(Receive(Equal("/info")))
+		Context("when the daemon won't start", func() {
+			BeforeEach(func() {
+				fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
+					close(ready)
+					select {
+					case signal := <-signals:
+						return errors.New(signal.String())
+					case <-time.After(1 * time.Second):
+						// Daemon "crashes" after a while
+					}
+					return nil
+				}
+			})
+
+			It("times out", func() {
+				err := <-lifecycle.Wait()
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("Timed out waiting for docker daemon to start"))
+			})
+
+			Context("and the process is interrupted", func() {
+				JustBeforeEach(func() {
+					lifecycle.Signal(os.Interrupt)
+				})
+
+				It("exists with error", func() {
+					err := <-lifecycle.Wait()
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("fake_docker_daemon exited with error: interrupt"))
+					Expect(err.Error()).To(ContainSubstring("builder exited with error: interrupt"))
+				})
+			})
+		})
+
+		Context("when the daemon starts", func() {
+			requestAddr := make(chan string, 1)
+			var listener net.Listener
+
+			BeforeEach(func() {
+				var err error
+				listener, err = net.Listen("unix", builder.DockerDaemonUnixSocket)
+				Expect(err).NotTo(HaveOccurred())
+
+				fakeDeamonRunner = func(signals <-chan os.Signal, ready chan<- struct{}) error {
+					close(ready)
+
+					go func() {
+						defer GinkgoRecover()
+						srvr := &http.Server{
+							Handler: http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+								requestAddr <- request.RequestURI
+							}),
+							ReadTimeout:  time.Second,
+							WriteTimeout: time.Second,
+						}
+						srvr.Serve(listener)
+					}()
+
+					return nil
+				}
+			})
+
+			AfterEach(func() {
+				Expect(listener.Close()).To(Succeed())
+			})
+
+			It("sends a ping request to the daemon", func() {
+				Eventually(requestAddr).Should(Receive(Equal("/info")))
+			})
 		})
 	})
 
