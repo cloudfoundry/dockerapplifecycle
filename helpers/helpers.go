@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -86,12 +87,13 @@ func ParseRepositoryTag(repos string) (string, string) {
 	return repos, ""
 }
 
-func FetchMetadata(registryURL string, repoName string, tag string, insecureRegistries []string, credentials auth.CredentialStore) (*Image, error) {
+func FetchMetadata(registryURL string, repoName string, tag string, insecureRegistries []string, credentials auth.CredentialStore, stderr io.Writer) (*Image, error) {
 	scheme := "https"
-	transport, err := makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials)
+	var err error
+	transport, err := makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials, stderr)
 	if err != nil {
 		scheme = "http"
-		transport, err = makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials)
+		transport, err = makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials, stderr)
 		if err != nil {
 			return nil, err
 		}
@@ -99,26 +101,37 @@ func FetchMetadata(registryURL string, repoName string, tag string, insecureRegi
 
 	repoClient, err := client.NewRepository(context.TODO(), repoName, scheme+"://"+registryURL, transport)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed making docker repository client:", err)
+		fmt.Fprintln(stderr, "Failed making docker repository client:", err)
 		return nil, err
 	}
 
 	manifestService, err := repoClient.Manifests(context.TODO())
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed getting docker image manifests:", err)
+		fmt.Fprintln(stderr, "Failed getting docker image manifests:", err)
 		return nil, err
 	}
 
+	// var manifest *manifest.SignedManifest
+	// var err2 error
 	manifest, err := manifestService.GetByTag(tag)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed getting docker image by tag:", err)
-		return nil, err
+	for i := 0; i <= 3; i++ {
+		if err != nil {
+			if i < 3 {
+				fmt.Fprintln(stderr, "Failed getting docker image by tag:", err, " Going to retry attempt:", i+1)
+				manifest, err = manifestService.GetByTag(tag)
+				continue
+			}
+			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err)
+			return nil, err
+		} else {
+			break
+		}
 	}
 
 	var image Image
 	err = json.Unmarshal([]byte(manifest.History[0].V1Compatibility), &image)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed parsing docker image JSON:", err)
+		fmt.Fprintln(stderr, "Failed parsing docker image JSON:", err)
 		return nil, err
 	}
 
@@ -164,7 +177,7 @@ func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error
 	return nil
 }
 
-func makeTransport(scheme, registryURL, repository string, insecureRegistries []string, credentialStore auth.CredentialStore) (http.RoundTripper, error) {
+func makeTransport(scheme, registryURL, repository string, insecureRegistries []string, credentialStore auth.CredentialStore, stderr io.Writer) (http.RoundTripper, error) {
 	baseTransport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		Dial: (&net.Dialer{
@@ -204,13 +217,13 @@ func makeTransport(scheme, registryURL, repository string, insecureRegistries []
 
 	resp, err := pingClient.Do(req)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to talk to docker registry:", err)
+		fmt.Fprintln(stderr, "Failed to talk to docker registry:", err)
 		return nil, err
 	} else {
 		defer resp.Body.Close()
 
 		if err := challengeManager.AddResponse(resp); err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to talk to docker registry:", err)
+			fmt.Fprintln(stderr, "Failed to talk to docker registry:", err)
 			return nil, err
 		}
 	}

@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 )
 
@@ -140,6 +141,26 @@ var _ = Describe("Builder helpers", func() {
 		)
 	}
 
+	setupSlowRegistry := func(tag ...string) {
+		tagString := "latest"
+		if len(tag) > 0 {
+			tagString = tag[0]
+		}
+
+		server.AppendHandlers(
+			ghttp.RespondWith(200, "Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection."),
+			ghttp.RespondWith(200, "Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection."),
+			ghttp.RespondWith(200, "Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection."),
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tagString),
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Header().Set("X-Docker-Token", "token-1,token-2")
+					w.Write([]byte(response))
+				}),
+			),
+		)
+	}
+
 	setupRegistry := func(tag ...string) {
 		tagString := "latest"
 		if len(tag) > 0 {
@@ -236,7 +257,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -248,7 +269,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -261,7 +282,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -274,16 +295,35 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
 				Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+			})
+		})
+
+		Context("when the network connection is slow", func() {
+			BeforeEach(func() {
+				repoName = "some_user/some_repo"
+				tag = "some-tag"
+
+				setupSlowRegistry(tag)
+			})
+
+			It("should retry 3 times", func() {
+				stderr := gbytes.NewBuffer()
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, stderr)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(stderr).To(gbytes.Say("retry attempt: 1"))
+				Expect(stderr).To(gbytes.Say("retry attempt: 2"))
+				Expect(stderr).To(gbytes.Say("retry attempt: 3"))
 			})
 		})
 
@@ -296,12 +336,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
@@ -316,12 +356,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the exposed ports", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img.Config).NotTo(BeNil())
 
 				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("tcp", "8080"), struct{}{}))
@@ -338,12 +378,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())

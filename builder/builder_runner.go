@@ -79,7 +79,7 @@ func (builder Builder) build() <-chan error {
 
 		credentials := basicCredentialStore{builder.DockerUser, builder.DockerPassword}
 
-		img, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, builder.InsecureDockerRegistries, credentials)
+		img, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, builder.InsecureDockerRegistries, credentials, os.Stderr)
 		if err != nil {
 			errorChan <- fmt.Errorf(
 				"failed to fetch metadata from [%s] with tag [%s] and insecure registries %s due to %s",
