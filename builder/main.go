@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -122,32 +121,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *cacheDockerImage {
-		if len(dockerRegistryIPs) == 0 {
-			println("missing flag: dockerRegistryIPs required")
-			os.Exit(1)
-		}
-		if len(*dockerRegistryHost) == 0 {
-			println("missing flag: dockerRegistryHost required")
-			os.Exit(1)
-		}
-		if strings.Contains(*dockerRegistryHost, ":") {
-			println("invalid host format", *dockerRegistryHost)
-			os.Exit(1)
-		}
-		if *dockerRegistryPort < 0 {
-			println("negative port number", *dockerRegistryPort)
-			os.Exit(1)
-		}
-		if *dockerRegistryPort > 65535 {
-			println("port number too big", *dockerRegistryPort)
-			os.Exit(1)
-		}
-		if !*dockerRegistryRequireTLS {
-			insecureDockerRegistries = append(insecureDockerRegistries, fmt.Sprintf("%s:%d", *dockerRegistryHost, *dockerRegistryPort))
-		}
-	}
-
 	builder := Builder{
 		RegistryURL:                registryURL,
 		RepoName:                   repoName,
@@ -172,23 +145,6 @@ func main() {
 		{"builder", ifrit.RunFunc(builder.Run)},
 	}
 
-	if *cacheDockerImage {
-		validateCredentials(*dockerLoginServer, *dockerUser, *dockerPassword, *dockerEmail)
-
-		if _, err := os.Stat(*dockerDaemonExecutablePath); err != nil {
-			println("docker daemon not found in", *dockerDaemonExecutablePath)
-			os.Exit(1)
-		}
-
-		dockerDaemon := DockerDaemon{
-			DockerDaemonPath:         *dockerDaemonExecutablePath,
-			InsecureDockerRegistries: insecureDockerRegistries,
-			DockerRegistryIPs:        dockerRegistryIPs,
-			DockerRegistryHost:       *dockerRegistryHost,
-		}
-		members = append(members, grouper.Member{"docker_daemon", ifrit.RunFunc(dockerDaemon.Run)})
-	}
-
 	group := grouper.NewParallel(os.Interrupt, members)
 	process := ifrit.Invoke(sigmon.New(group))
 
@@ -201,33 +157,6 @@ func main() {
 	}
 
 	fmt.Println("Staging process finished")
-}
-
-func validateCredentials(server, user, password, email string) {
-	missing := len(user) == 0 && len(password) == 0 && len(email) == 0
-	present := len(user) > 0 && len(password) > 0 && len(email) > 0
-
-	if missing {
-		return
-	}
-
-	if !present {
-		println("missing flags: dockerUser, dockerPassword and dockerEmail required simultaneously")
-		os.Exit(1)
-	}
-
-	if !(strings.Contains(email, "@") && strings.Contains(email, ".")) {
-		println(fmt.Sprintf("invalid dockerEmail [%s]", email))
-		os.Exit(1)
-	}
-
-	if len(server) > 0 {
-		_, err := url.Parse(server)
-		if err != nil {
-			println(fmt.Sprintf("invalid dockerLoginServer [%s]", server))
-			os.Exit(1)
-		}
-	}
 }
 
 func (r *registries) String() string {

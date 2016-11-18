@@ -3,18 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"strconv"
 	"time"
 
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
-	"code.cloudfoundry.org/dockerapplifecycle/unix_transport"
-	"github.com/nu7hatch/gouuid"
 )
 
 type Builder struct {
@@ -38,16 +34,6 @@ type Builder struct {
 }
 
 func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
-	if builder.CacheDockerImage {
-		if builder.DockerDaemonUnixSocket == "" {
-			builder.DockerDaemonExecutablePath = "/var/run/docker.sock/info"
-		}
-
-		err := builder.waitForDocker(signals)
-		if err != nil {
-			return err
-		}
-	}
 	close(ready)
 
 	select {
@@ -115,15 +101,6 @@ func (builder Builder) build() <-chan error {
 		}
 		info.DockerImage = dockerImageURL
 
-		if builder.CacheDockerImage {
-			info.DockerImage, err = builder.cacheDockerImage(dockerImageURL)
-			if err != nil {
-				println("failed to cache image", dockerImageURL, err.Error())
-				errorChan <- err
-				return
-			}
-		}
-
 		if err := helpers.SaveMetadata(builder.OutputFilename, &info); err != nil {
 			errorChan <- fmt.Errorf(
 				"failed to save metadata to [%s] due to %s",
@@ -160,115 +137,4 @@ func sortPorts(dockerPorts map[nat.Port]struct{}) []nat.Port {
 		return ip.Int() < jp.Int() || (ip.Int() == jp.Int() && ip.Proto() == "tcp")
 	})
 	return dockerPortsSlice
-}
-
-func (builder *Builder) cacheDockerImage(dockerImage string) (string, error) {
-	fmt.Println("Caching docker image ...")
-
-	if builder.CacheDockerImage && len(builder.DockerUser) > 0 && len(builder.DockerPassword) > 0 && len(builder.DockerEmail) > 0 {
-		fmt.Printf("Logging to %s ...\n", builder.DockerLoginServer)
-		err := builder.RunDockerCommand("login", "-u", builder.DockerUser, "-p", builder.DockerPassword, "-e", builder.DockerEmail, builder.DockerLoginServer)
-		if err != nil {
-			return "", err
-		}
-		fmt.Println("Logged in.")
-	}
-
-	fmt.Printf("Pulling docker image %s ...\n", dockerImage)
-	err := builder.RunDockerCommand("pull", dockerImage)
-	if err != nil {
-		return "", err
-	}
-	fmt.Println("Docker image pulled.")
-
-	cachedDockerImage, err := builder.GenerateImageName()
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("Docker image will be cached as %s\n", cachedDockerImage)
-
-	fmt.Printf("Tagging docker image %s as %s ...\n", dockerImage, cachedDockerImage)
-	err = builder.RunDockerCommand("tag", dockerImage, cachedDockerImage)
-	if err != nil {
-		return "", err
-	}
-	fmt.Println("Docker image tagged.")
-
-	fmt.Printf("Pushing docker image %s\n", cachedDockerImage)
-	err = builder.RunDockerCommand("push", cachedDockerImage)
-	if err != nil {
-		return "", err
-	}
-	fmt.Println("Docker image pushed.")
-	fmt.Println("Docker image caching completed.")
-
-	return cachedDockerImage, nil
-}
-
-func (builder *Builder) RunDockerCommand(args ...string) error {
-	cmd := exec.Command(builder.DockerDaemonExecutablePath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = os.Environ()
-	return cmd.Run()
-}
-
-func (builder *Builder) GenerateImageName() (string, error) {
-	uuid, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s:%d/%s", builder.DockerRegistryHost, builder.DockerRegistryPort, uuid), nil
-}
-
-func (builder *Builder) waitForDocker(signals <-chan os.Signal) error {
-	giveUp := make(chan struct{})
-	defer close(giveUp)
-
-	select {
-	case err := <-builder.waitForDockerDaemon(giveUp):
-		if err != nil {
-			return err
-		}
-	case <-time.After(builder.DockerDaemonTimeout):
-		return errors.New("Timed out waiting for docker daemon to start")
-	case signal := <-signals:
-		return errors.New(signal.String())
-	}
-
-	return nil
-}
-
-func (builder *Builder) waitForDockerDaemon(giveUp <-chan struct{}) <-chan error {
-	errChan := make(chan error, 1)
-	client := http.Client{Transport: unix_transport.New(builder.DockerDaemonUnixSocket)}
-
-	go builder.pingDaemonPeriodically(client, errChan, giveUp)
-
-	return errChan
-}
-
-func (builder Builder) pingDaemonPeriodically(client http.Client, errChan chan<- error, giveUp <-chan struct{}) {
-	for {
-		resp, err := client.Get("unix://" + builder.DockerDaemonUnixSocket + "/info")
-		if err != nil {
-			select {
-			case <-giveUp:
-				return
-			case <-time.After(100 * time.Millisecond):
-			}
-			continue
-		} else {
-			if resp.StatusCode == http.StatusOK {
-				fmt.Println("Docker daemon running")
-			} else {
-				errChan <- fmt.Errorf("Docker daemon failed to start. Ping returned %s", resp.Status)
-				return
-			}
-			break
-		}
-
-	}
-	errChan <- nil
-	return
 }
