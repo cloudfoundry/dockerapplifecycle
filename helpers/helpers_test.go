@@ -3,8 +3,10 @@ package helpers_test
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 
@@ -12,11 +14,21 @@ import (
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
+	"github.com/docker/distribution/registry/client/auth"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 )
+
+type testCreds struct {
+	user     string
+	password string
+}
+
+func (t testCreds) Basic(url *url.URL) (string, string) {
+	return t.user, t.password
+}
 
 var _ = Describe("Builder helpers", func() {
 	var response = `{
@@ -388,6 +400,140 @@ var _ = Describe("Builder helpers", func() {
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
 				Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+			})
+		})
+
+		Context("with a private registry with token authorization", func() {
+			var credStore auth.CredentialStore
+			BeforeEach(func() {
+				server = ghttp.NewUnstartedServer()
+				registryURL = server.Addr()
+				credStore = testCreds{"username", "password"}
+
+				authenticateHeader := http.Header{}
+				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token"`, registryURL))
+				server.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/v2/"),
+						ghttp.RespondWith(401, "", authenticateHeader),
+					),
+				)
+				server.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/token"),
+						ghttp.VerifyBasicAuth("username", "password"),
+						ghttp.RespondWith(200, `{"token":"tokenstring"}`),
+					),
+				)
+			})
+
+			Context("with a valid repository:tag reference", func() {
+				BeforeEach(func() {
+					repoName = "some_user/some_repo"
+					tag = "some-tag"
+
+					server.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
+							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
+							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+								w.Header().Set("X-Docker-Token", "token-1,token-2")
+								w.Write([]byte(response))
+							}),
+						),
+					)
+				})
+
+				It("should not error", func() {
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return the top-most image layer metadata", func() {
+					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
+					Expect(img).NotTo(BeNil())
+					Expect(img.Config).NotTo(BeNil())
+					Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+				})
+			})
+
+			Context("with a valid repository:tag reference", func() {
+				BeforeEach(func() {
+					repoName = "some_user/some_repo"
+					tag = "some-tag"
+
+					server.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
+							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
+							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+								w.Header().Set("X-Docker-Token", "token-1,token-2")
+								w.Write([]byte(response))
+							}),
+						),
+					)
+				})
+
+				It("should not error", func() {
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return the top-most image layer metadata", func() {
+					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
+					Expect(img).NotTo(BeNil())
+					Expect(img.Config).NotTo(BeNil())
+					Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+				})
+			})
+
+		})
+
+		Context("with a private registry with basic authorization", func() {
+			var credStore auth.CredentialStore
+			BeforeEach(func() {
+				server = ghttp.NewUnstartedServer()
+				registryURL = server.Addr()
+				credStore = testCreds{"username", "password"}
+
+				authenticateHeader := http.Header{}
+				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="http://%s/token"`, registryURL))
+				server.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/v2/"),
+						ghttp.RespondWith(401, "", authenticateHeader),
+					),
+				)
+			})
+
+			Context("with a valid repository:tag reference", func() {
+				BeforeEach(func() {
+					repoName = "some_user/some_repo"
+					tag = "some-tag"
+
+					server.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyBasicAuth("username", "password"),
+							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
+							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+								w.Header().Set("X-Docker-Token", "token-1,token-2")
+								w.Write([]byte(response))
+							}),
+						),
+					)
+				})
+
+				It("should not error", func() {
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return the top-most image layer metadata", func() {
+					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
+					Expect(img).NotTo(BeNil())
+					Expect(img.Config).NotTo(BeNil())
+					Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+				})
 			})
 		})
 	})

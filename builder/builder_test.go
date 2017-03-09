@@ -260,6 +260,61 @@ var _ = Describe("Building", func() {
 			testValid()
 		}
 
+		Context("with a private docker registry", func() {
+			BeforeEach(func() {
+				fakeDockerRegistry = ghttp.NewServer()
+				dockerPassword = "fakedockerpassword"
+				dockerUser = "fakedockeruser"
+
+				parts, err := url.Parse(fakeDockerRegistry.URL())
+				Expect(err).NotTo(HaveOccurred())
+				dockerRef = fmt.Sprintf("%s/some-repo", parts.Host)
+			})
+
+			Context("with a valid docker ref", func() {
+				BeforeEach(func() {
+					authenticateHeader := http.Header{}
+					authenticateHeader.Add("WWW-Authenticate", `Basic realm="testRegistry"`)
+					fakeDockerRegistry.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", "/v2/"),
+							ghttp.RespondWith(401, "", authenticateHeader),
+						),
+					)
+
+					response := `{"id":"layer-1","parent":"parent-1","Config":{"Cmd":["-bazbot","-foobar"],"Entrypoint":["/dockerapp","-t"],"WorkingDir":"/workdir"}}`
+					fakeDockerRegistry.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyBasicAuth(dockerUser, dockerPassword),
+							ghttp.VerifyRequest("GET", "/v2/some-repo/manifests/latest"),
+							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+								response := makeResponse(response)
+								w.Write([]byte(response))
+							}),
+						),
+					)
+				})
+
+				It("should exit successfully", func() {
+					session := setupBuilder()
+					Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+				})
+
+				Describe("the json", func() {
+					It("should contain the execution metadata", func() {
+						session := setupBuilder()
+						Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+
+						result := resultJSON()
+
+						Expect(result).To(ContainSubstring(`\"cmd\":[\"-bazbot\",\"-foobar\"]`))
+						Expect(result).To(ContainSubstring(`\"entrypoint\":[\"/dockerapp\",\"-t\"]`))
+						Expect(result).To(ContainSubstring(`\"workdir\":\"/workdir\"`))
+					})
+				})
+			})
+		})
+
 		Context("with a valid insecure docker registries", func() {
 			BeforeEach(func() {
 				parts, err := url.Parse(fakeDockerRegistry.URL())

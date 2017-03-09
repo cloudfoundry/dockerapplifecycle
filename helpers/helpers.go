@@ -221,7 +221,6 @@ func makeTransport(scheme, registryURL, repository string, insecureRegistries []
 		return nil, err
 	} else {
 		defer resp.Body.Close()
-
 		if err := challengeManager.AddResponse(resp); err != nil {
 			fmt.Fprintln(stderr, "Failed to talk to docker registry:", err)
 			return nil, err
