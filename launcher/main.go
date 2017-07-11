@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"syscall"
 
@@ -78,6 +79,7 @@ func main() {
 		}
 	}
 
+	runtime.GOMAXPROCS(1)
 	err = syscall.Exec(argv[0], argv, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to run: %s", err)
