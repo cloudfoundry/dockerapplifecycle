@@ -1,17 +1,23 @@
 package main_test
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
+
+	"code.cloudfoundry.org/cfhttp"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
+	"github.com/onsi/gomega/ghttp"
 )
 
 var _ = Describe("Launcher", func() {
@@ -111,6 +117,178 @@ var _ = Describe("Launcher", func() {
 		})
 
 		ItExecutesTheCommandWithTheRightEnvironment()
+	})
+
+	Describe("interpolation of credhub-ref in VCAP_SERVICES", func() {
+		var (
+			startCommand string
+			server       *ghttp.Server
+		)
+
+		pwd := func() string {
+			pwd, err := os.Getwd()
+			Expect(err).NotTo(HaveOccurred())
+			return pwd
+		}
+
+		tlsConfig := func() *tls.Config {
+			serverCertPath := path.Join(pwd(), "fixtures", "credhubserver.crt")
+			serverKeyPath := path.Join(pwd(), "fixtures", "credhubserver.key")
+			caCertPath := path.Join(pwd(), "fixtures", "ca-certs", "credhubtest.crt")
+
+			tlsConfig, err := cfhttp.NewTLSConfig(serverCertPath, serverKeyPath, caCertPath)
+			Expect(err).NotTo(HaveOccurred())
+			return tlsConfig
+		}
+
+		BeforeEach(func() {
+			server = ghttp.NewUnstartedServer()
+			server.HTTPTestServer.TLS = tlsConfig()
+			startCommand = "env; echo running app"
+
+			clientCertPath := path.Join(pwd(), "fixtures", "credhubclient.crt")
+			clientKeyPath := path.Join(pwd(), "fixtures", "credhubclient.key")
+
+			env := os.Environ()
+			caCertDir := path.Join(pwd(), "fixtures", "ca-certs")
+			env = append(env, fmt.Sprintf("CF_SYSTEM_CERT_PATH=%s", caCertDir))
+			env = append(env, fmt.Sprintf("CF_INSTANCE_CERT=%s", clientCertPath))
+			env = append(env, fmt.Sprintf("CF_INSTANCE_KEY=%s", clientKeyPath))
+			launcherCmd.Env = env
+			server.HTTPTestServer.StartTLS()
+		})
+
+		Context("when VCAP_SERVICES contains credhub refs", func() {
+			var vcapServicesValue string
+			BeforeEach(func() {
+				vcapServicesValue = `{"my-server":[{"credentials":{"credhub-ref":"(//my-server/creds)"}}]}`
+				launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
+			})
+
+			Context("when the credhub location is passed to the launcher", func() {
+				BeforeEach(func() {
+					launcherCmd.Args = []string{
+						"launcher",
+						appDir,
+						startCommand,
+						"{}",
+					}
+					credhubLocation := `{ "credhub-uri": "` + server.URL() + `"}`
+					launcherCmd.Env = append(launcherCmd.Env, "VCAP_PLATFORM_OPTIONS="+credhubLocation)
+				})
+
+				Context("when credhub successfully interpolates", func() {
+					BeforeEach(func() {
+						server.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
+								ghttp.VerifyBody([]byte(vcapServicesValue)),
+								ghttp.RespondWith(http.StatusOK, "INTERPOLATED_JSON"),
+							))
+					})
+
+					It("updates VCAP_SERVICES with the interpolated content", func() {
+						Eventually(session).Should(gexec.Exit(0))
+						Eventually(session.Out).Should(gbytes.Say("VCAP_SERVICES=INTERPOLATED_JSON"))
+					})
+				})
+
+				Context("when credhub fails", func() {
+					BeforeEach(func() {
+						server.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
+								ghttp.VerifyBody([]byte(vcapServicesValue)),
+								ghttp.RespondWith(http.StatusInternalServerError, "{}"),
+							))
+					})
+
+					It("prints an error message", func() {
+						Eventually(session).Should(gexec.Exit(4))
+						Eventually(session.Err).Should(gbytes.Say("Unable to interpolate credhub references"))
+					})
+				})
+
+				Context("when the credhub server cert is invalid", func() {
+					BeforeEach(func() {
+						server.Close()
+						server = ghttp.NewUnstartedServer()
+						server.HTTPTestServer.TLS = tlsConfig()
+						invalidCertPath := path.Join(pwd(), "fixtures", "invalid.crt")
+						invalidKeyPath := path.Join(pwd(), "fixtures", "invalid.key")
+						cert, err := tls.LoadX509KeyPair(invalidCertPath, invalidKeyPath)
+						Expect(err).NotTo(HaveOccurred())
+						server.HTTPTestServer.TLS.Certificates = []tls.Certificate{cert}
+						server.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
+								ghttp.VerifyBody([]byte(vcapServicesValue)),
+								ghttp.RespondWith(http.StatusOK, "INTERPOLATED_JSON"),
+							),
+						)
+						server.HTTPTestServer.StartTLS()
+
+						credhubLocation := `{ "credhub-uri": "` + server.URL() + `"}`
+						launcherCmd.Env = append(launcherCmd.Env, "VCAP_PLATFORM_OPTIONS="+credhubLocation)
+					})
+
+					It("returns an error", func() {
+						Eventually(session).Should(gexec.Exit(4))
+						Eventually(session.Err).Should(gbytes.Say("certificate signed by unknown authority"))
+					})
+				})
+			})
+
+			Context("when the credhub location is not passed to the launcher", func() {
+				BeforeEach(func() {
+					launcherCmd.Args = []string{
+						"launcher",
+						appDir,
+						startCommand,
+						"{}",
+					}
+					launcherCmd.Env = append(launcherCmd.Env, "VCAP_PLATFORM_OPTIONS={}")
+				})
+
+				It("does not attempt to do any credhub interpolation", func() {
+					Eventually(session).Should(gexec.Exit(0))
+					Eventually(string(session.Out.Contents())).Should(ContainSubstring(fmt.Sprintf(fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))))
+				})
+			})
+
+			Context("when the platform options is missing", func() {
+				BeforeEach(func() {
+					launcherCmd.Args = []string{
+						"launcher",
+						appDir,
+						startCommand,
+						"{}",
+					}
+				})
+
+				It("does not attempt to do any credhub interpolation", func() {
+					Eventually(session).Should(gexec.Exit(0))
+					Eventually(string(session.Out.Contents())).Should(ContainSubstring(fmt.Sprintf(fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))))
+				})
+			})
+
+			Context("when a platform options with invalid JSON is passed to the launcher", func() {
+				BeforeEach(func() {
+					launcherCmd.Args = []string{
+						"launcher",
+						appDir,
+						startCommand,
+						"{}",
+					}
+					launcherCmd.Env = append(launcherCmd.Env, `VCAP_PLATFORM_OPTIONS={"credhub-uri":"missing quote and brace`)
+				})
+
+				It("prints an error message", func() {
+					Eventually(session).Should(gexec.Exit(3))
+					Eventually(session.Err).Should(gbytes.Say("Invalid platform options"))
+				})
+			})
+		})
 	})
 
 	Context("when no start command is given", func() {
