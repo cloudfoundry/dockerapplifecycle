@@ -193,7 +193,7 @@ var _ = Describe("Launcher", func() {
 					})
 				})
 
-				Context("when credhub fails", func() {
+				Context("when credhub interpolation fails", func() {
 					BeforeEach(func() {
 						server.AppendHandlers(
 							ghttp.CombineHandlers(
@@ -206,6 +206,18 @@ var _ = Describe("Launcher", func() {
 					It("prints an error message", func() {
 						Eventually(session).Should(gexec.Exit(4))
 						Eventually(session.Err).Should(gbytes.Say("Unable to interpolate credhub references"))
+					})
+
+					Context("and the app doesn't have credhub in its service bindings", func() {
+						BeforeEach(func() {
+							vcapServicesValue = `{"my-server":[{"credentials":{"other-cred-manager":"(//my-server/creds)"}}]}`
+							launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
+						})
+
+						It("launches the app successfully", func() {
+							Eventually(session).Should(gexec.Exit(0))
+							Eventually(session.Out).Should(gbytes.Say(fmt.Sprintf("VCAP_SERVICES=%s", regexp.QuoteMeta(vcapServicesValue))))
+						})
 					})
 				})
 
@@ -235,6 +247,29 @@ var _ = Describe("Launcher", func() {
 					It("returns an error", func() {
 						Eventually(session).Should(gexec.Exit(4))
 						Eventually(session.Err).Should(gbytes.Say("certificate signed by unknown authority"))
+					})
+				})
+
+				Context("when no instance identity credentials are supplied", func() {
+					BeforeEach(func() {
+						launcherCmd.Env = append(launcherCmd.Env, "CF_INSTANCE_CERT=", "CF_INSTANCE_KEY=")
+					})
+
+					It("prints an error message", func() {
+						Eventually(session).Should(gexec.Exit(4))
+						Eventually(session.Err).Should(gbytes.Say("Unable to create a credhub client"))
+					})
+
+					Context("and the app doesn't have credhub in its service bindings", func() {
+						BeforeEach(func() {
+							vcapServicesValue = `{"my-server":[{"credentials":{"other-cred-manager":"(//my-server/creds)"}}]}`
+							launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
+						})
+
+						It("launches the app successfully", func() {
+							Eventually(session).Should(gexec.Exit(0))
+							Eventually(session.Out).Should(gbytes.Say(fmt.Sprintf("VCAP_SERVICES=%s", regexp.QuoteMeta(vcapServicesValue))))
+						})
 					})
 				})
 			})

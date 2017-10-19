@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/cloudfoundry-incubator/credhub-cli/credhub"
@@ -114,6 +115,12 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 		return
 	}
 
+	vcapServices := os.Getenv("VCAP_SERVICES")
+	if !strings.Contains(vcapServices, `"credhub-ref"`) {
+		fmt.Fprintf(os.Stderr, "VCAP_SERVICES does not have any credhub-ref values")
+		return
+	}
+
 	certPath := os.Getenv("CF_INSTANCE_CERT")
 	keyPath := os.Getenv("CF_INSTANCE_KEY")
 	rootCAs := rootCAs()
@@ -124,7 +131,6 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 		os.Exit(4)
 	}
 
-	vcapServices := os.Getenv("VCAP_SERVICES")
 	interpolatedVcapServices, err := ch.InterpolateString(vcapServices)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to interpolate credhub references: %s", err)
