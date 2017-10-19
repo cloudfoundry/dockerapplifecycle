@@ -31,120 +31,16 @@ func (t testCreds) Basic(url *url.URL) (string, string) {
 }
 
 var _ = Describe("Builder helpers", func() {
-	var response = `{
-   "schemaVersion": 1,
-   "name": "cloudfoundry/diego-docker-app",
-   "tag": "latest",
-   "architecture": "amd64",
-   "fsLayers": [
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:b1238eb35a82386918217263b74d44d17ed450a1ed3db50b430d523c3a2342b7"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:39702b58482c695535d7d86333f222733ecea49d80132707d35d73b02878e608"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:1db09adb5ddd7f1a07b6d585a7db747a51c7bd17418d47e91f901bdf420abd66"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      }
-   ],
-   "history": [
-      {
-         "v1Compatibility": "{\"id\":\"7ea1ccc3c3ebe0cd68f07be3dca8ab3a74c8652de6892b87fde66805f9e7b496\",\"parent\":\"f32290ad356da6e1256f228e53b21af11b9ec1b9e81a35920361d11304170891\",\"created\":\"2015-08-21T00:19:28.139525649Z\",\"container\":\"8fd2f1227d1ce59825ff630ea82b26a7244144130cb8ca1b0bc93eca9ce743ed\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) CMD [\\\"./dockerapp\\\"]\"],\"Image\":\"f32290ad356da6e1256f228e53b21af11b9ec1b9e81a35920361d11304170891\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"./dockerapp\"],\"Image\":\"f32290ad356da6e1256f228e53b21af11b9ec1b9e81a35920361d11304170891\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"f32290ad356da6e1256f228e53b21af11b9ec1b9e81a35920361d11304170891\",\"parent\":\"8a9960d2adab8b1219da489720e214abe42a7aac59c1eaa870773db37a768fa1\",\"created\":\"2015-08-21T00:19:27.969274026Z\",\"container\":\"097bcffd1c4b366a02759f546e376a0b1b9918d291dae26a9f9c9ccf59a0c24c\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"adduser -D vcap\"],\"Image\":\"8a9960d2adab8b1219da489720e214abe42a7aac59c1eaa870773db37a768fa1\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"8a9960d2adab8b1219da489720e214abe42a7aac59c1eaa870773db37a768fa1\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":2673}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"8a9960d2adab8b1219da489720e214abe42a7aac59c1eaa870773db37a768fa1\",\"parent\":\"df587f288b3b25f5632876be520d5e3e4b9464eb669ba27483b361b0eb061966\",\"created\":\"2015-08-21T00:18:11.330238508Z\",\"container\":\"13ea240036a56abb25d5f4b1c89fe876ee5c67e29067dacf9d53d4b400fa9a7b\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) WORKDIR /myapp\"],\"Image\":\"df587f288b3b25f5632876be520d5e3e4b9464eb669ba27483b361b0eb061966\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"df587f288b3b25f5632876be520d5e3e4b9464eb669ba27483b361b0eb061966\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"df587f288b3b25f5632876be520d5e3e4b9464eb669ba27483b361b0eb061966\",\"parent\":\"db04f28a5c7020233e53fd499c13ee0825332dbe1dea460343e0d321b7b24e1e\",\"created\":\"2015-08-21T00:18:11.137585237Z\",\"container\":\"9353b2fd746a53057aef105ecc461b92a975720a2a55c8a339754122f3ba3e62\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) COPY file:2e7c934245de1a54e14719c166d7e9da1ea7ffbf4a7d4ab582aadd846d8a8410 in /myapp/dockerapp\"],\"Image\":\"db04f28a5c7020233e53fd499c13ee0825332dbe1dea460343e0d321b7b24e1e\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"db04f28a5c7020233e53fd499c13ee0825332dbe1dea460343e0d321b7b24e1e\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":6205408}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"db04f28a5c7020233e53fd499c13ee0825332dbe1dea460343e0d321b7b24e1e\",\"parent\":\"f5637bee1ed6d24624af87171b43b610317ce279982cd8ba4c6d9b20ba13f883\",\"created\":\"2015-07-27T21:25:00.353200497Z\",\"container\":\"22f3e2437ac329aa76eea96799cb3c8c2e31c46b9a47e529f544d055f7d280b9\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) EXPOSE 8080/tcp\"],\"Image\":\"f5637bee1ed6d24624af87171b43b610317ce279982cd8ba4c6d9b20ba13f883\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"f5637bee1ed6d24624af87171b43b610317ce279982cd8ba4c6d9b20ba13f883\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"f5637bee1ed6d24624af87171b43b610317ce279982cd8ba4c6d9b20ba13f883\",\"parent\":\"11376daad7c309fcb61b8e0f60fc225d3fb4c137fd7d5bd9ffb96ffc02984148\",\"created\":\"2015-07-27T21:25:00.153173623Z\",\"container\":\"dfdad968c9c53bee5e1cbb7cc2be990eac60764fcd83f558629ee4840b42e044\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) ENV SOME_VAR=some_docker_value\"],\"Image\":\"11376daad7c309fcb61b8e0f60fc225d3fb4c137fd7d5bd9ffb96ffc02984148\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"11376daad7c309fcb61b8e0f60fc225d3fb4c137fd7d5bd9ffb96ffc02984148\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"11376daad7c309fcb61b8e0f60fc225d3fb4c137fd7d5bd9ffb96ffc02984148\",\"parent\":\"c116d10b2719cf284232e648a3dedfa00f486aa36b33f103e3451d38b50750f8\",\"created\":\"2015-07-27T21:24:59.986302656Z\",\"container\":\"6f87a4c58f08d13f289bef33d15ce5136fd4f01ac56c7bf038b589d849216f58\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) ENV HOME=/home/some_docker_user\"],\"Image\":\"c116d10b2719cf284232e648a3dedfa00f486aa36b33f103e3451d38b50750f8\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"c116d10b2719cf284232e648a3dedfa00f486aa36b33f103e3451d38b50750f8\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"c116d10b2719cf284232e648a3dedfa00f486aa36b33f103e3451d38b50750f8\",\"parent\":\"4333cbf9a5602e88bd4ac6a97cc64e980dbdd9e85cb812026748629d55b5c986\",\"created\":\"2015-07-27T21:24:59.782883391Z\",\"container\":\"2f1367603f39af46c93081b78be2e2f6060ace6f1f8d9bf4a0600ed82007621c\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) ENV BAD_SHELL=$1\"],\"Image\":\"4333cbf9a5602e88bd4ac6a97cc64e980dbdd9e85cb812026748629d55b5c986\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"4333cbf9a5602e88bd4ac6a97cc64e980dbdd9e85cb812026748629d55b5c986\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"4333cbf9a5602e88bd4ac6a97cc64e980dbdd9e85cb812026748629d55b5c986\",\"parent\":\"0932715998f2ffc36135e1f051fa748eee842551295ef7fc218ea81fffd8c675\",\"created\":\"2015-07-27T21:24:59.572959896Z\",\"container\":\"2b29a2899dd5e823fef74762fcaa4408e781b396d9a1afde10d9a5fa5d055a8d\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) ENV BAD_QUOTE='\"],\"Image\":\"0932715998f2ffc36135e1f051fa748eee842551295ef7fc218ea81fffd8c675\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"0932715998f2ffc36135e1f051fa748eee842551295ef7fc218ea81fffd8c675\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"0932715998f2ffc36135e1f051fa748eee842551295ef7fc218ea81fffd8c675\",\"parent\":\"f299f81f08116b725aaa299e3ca89a81107a47bd34be43d3f1f62bb0a9909734\",\"created\":\"2015-07-27T21:24:59.363711955Z\",\"container\":\"f9c0c574a41e833dba420b89cc23c2dfc8842af765480c02c3c58ced516278bb\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) ENV VCAP_APPLICATION={}\"],\"Image\":\"f299f81f08116b725aaa299e3ca89a81107a47bd34be43d3f1f62bb0a9909734\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\"VCAP_APPLICATION={}\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"f299f81f08116b725aaa299e3ca89a81107a47bd34be43d3f1f62bb0a9909734\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"f299f81f08116b725aaa299e3ca89a81107a47bd34be43d3f1f62bb0a9909734\",\"parent\":\"8c2e06607696bd4afb3d03b687e361cc43cf8ec1a4a725bc96e39f05ba97dd55\",\"created\":\"2015-07-27T17:42:14.06035004Z\",\"container\":\"6a8de25300280150268c572188e254550388e70d35a62eb8c18cd41db15e726a\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) MAINTAINER https://github.com/cloudfoundry/diego-dockerfiles\"],\"Image\":\"8c2e06607696bd4afb3d03b687e361cc43cf8ec1a4a725bc96e39f05ba97dd55\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"docker_version\":\"1.7.1\",\"author\":\"https://github.com/cloudfoundry/diego-dockerfiles\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"/bin/sh\"],\"Image\":\"8c2e06607696bd4afb3d03b687e361cc43cf8ec1a4a725bc96e39f05ba97dd55\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":[],\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"8c2e06607696bd4afb3d03b687e361cc43cf8ec1a4a725bc96e39f05ba97dd55\",\"parent\":\"6ce2e90b0bc7224de3db1f0d646fe8e2c4dd37f1793928287f6074bc451a57ea\",\"created\":\"2015-04-17T22:01:13.062208605Z\",\"container\":\"811003e0012ef6e6db039bcef852098d45cf9f84e995efb93a176a11e9aca6b9\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":null,\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) CMD [\\\"/bin/sh\\\"]\"],\"Image\":\"6ce2e90b0bc7224de3db1f0d646fe8e2c4dd37f1793928287f6074bc451a57ea\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":null,\"Labels\":{}},\"docker_version\":\"1.6.0\",\"author\":\"Jérôme Petazzoni \\u003cjerome@docker.com\\u003e\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":null,\"Cmd\":[\"/bin/sh\"],\"Image\":\"6ce2e90b0bc7224de3db1f0d646fe8e2c4dd37f1793928287f6074bc451a57ea\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":null,\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"6ce2e90b0bc7224de3db1f0d646fe8e2c4dd37f1793928287f6074bc451a57ea\",\"parent\":\"cf2616975b4a3cba083ca99bc3f0bf25f5f528c3c52be1596b30f60b0b1c37ff\",\"created\":\"2015-04-17T22:01:12.62756842Z\",\"container\":\"19bbb9ebab4da181db898c79bbdd8d2a8010dc2e4a7dc8b1a24d4b5eff99c5b4\",\"container_config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":null,\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) ADD file:8cf517d90fe79547c474641cc1e6425850e04abbd8856718f7e4a184ea878538 in /\"],\"Image\":\"cf2616975b4a3cba083ca99bc3f0bf25f5f528c3c52be1596b30f60b0b1c37ff\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":null,\"Labels\":{}},\"docker_version\":\"1.6.0\",\"author\":\"Jérôme Petazzoni \\u003cjerome@docker.com\\u003e\",\"config\":{\"Hostname\":\"19bbb9ebab4d\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":null,\"Cmd\":null,\"Image\":\"cf2616975b4a3cba083ca99bc3f0bf25f5f528c3c52be1596b30f60b0b1c37ff\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":null,\"Labels\":{}},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":2433303}\n"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"cf2616975b4a3cba083ca99bc3f0bf25f5f528c3c52be1596b30f60b0b1c37ff\",\"created\":\"2015-04-17T22:01:05.451579326Z\",\"container\":\"39e791194498a7ee0c10e290ef51dd1ecde1f0fd83db977ddae38910b02b6fb9\",\"container_config\":{\"Hostname\":\"39e791194498\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":null,\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) MAINTAINER Jérôme Petazzoni \\u003cjerome@docker.com\\u003e\"],\"Image\":\"\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":null,\"Labels\":null},\"docker_version\":\"1.6.0\",\"author\":\"Jérôme Petazzoni \\u003cjerome@docker.com\\u003e\",\"config\":{\"Hostname\":\"39e791194498\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"PortSpecs\":null,\"ExposedPorts\":null,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":null,\"Cmd\":null,\"Image\":\"\",\"Volumes\":null,\"VolumeDriver\":\"\",\"WorkingDir\":\"\",\"Entrypoint\":null,\"NetworkDisabled\":false,\"MacAddress\":\"\",\"OnBuild\":null,\"Labels\":null},\"architecture\":\"amd64\",\"os\":\"linux\",\"Size\":0}\n"
-      }
-   ],
-   "signatures": [
-      {
-         "header": {
-            "jwk": {
-               "crv": "P-256",
-               "kid": "PAH5:7YBZ:CDN2:6FNN:7CEE:6B2X:QJLA:TEW4:FJDO:M7PE:JHDA:WVUC",
-               "kty": "EC",
-               "x": "HKEbXwisv2y0hpNthl6XvgtROTr_JukIi5qFQJ5bE8I",
-               "y": "JsVOxrCIY4Osa2PJb4SnPtw9KsDM62ZsSmdQ0YBldt0"
-            },
-            "alg": "ES256"
-         },
-         "signature": "D_sOhChLwN780Qzy_wCENSb1lZtDbItOvOP6_hGni9jrAs7wCsXiLaOT-XQ5Z_h6cCW_uJ5o_wmXbFNocaYqXg",
-         "protected": "eyJmb3JtYXRMZW5ndGgiOjI3MDY3LCJmb3JtYXRUYWlsIjoiQ24wIiwidGltZSI6IjIwMTUtMTAtMTlUMjI6MDc6MDBaIn0"
-      }
-   ]
- }`
-
 	var (
-		server *ghttp.Server
+		response string
+		server   *ghttp.Server
 	)
+
+	BeforeEach(func() {
+		bs, err := ioutil.ReadFile("manifest.yml")
+		Expect(err).NotTo(HaveOccurred())
+		response = string(bs)
+	})
 
 	setupPingableRegistry := func() {
 		server.AllowUnhandledRequests = true
@@ -316,7 +212,7 @@ var _ = Describe("Builder helpers", func() {
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
-				Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 			})
 		})
 
@@ -356,7 +252,7 @@ var _ = Describe("Builder helpers", func() {
 				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
-				Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 			})
 		})
 
@@ -399,7 +295,7 @@ var _ = Describe("Builder helpers", func() {
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
-				Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 			})
 		})
 
@@ -453,7 +349,7 @@ var _ = Describe("Builder helpers", func() {
 					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(img).NotTo(BeNil())
 					Expect(img.Config).NotTo(BeNil())
-					Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 				})
 			})
 
@@ -483,7 +379,7 @@ var _ = Describe("Builder helpers", func() {
 					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(img).NotTo(BeNil())
 					Expect(img.Config).NotTo(BeNil())
-					Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 				})
 			})
 
@@ -532,7 +428,7 @@ var _ = Describe("Builder helpers", func() {
 					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(img).NotTo(BeNil())
 					Expect(img.Config).NotTo(BeNil())
-					Expect(img.Config.Cmd).To(Equal([]string{"./dockerapp"}))
+					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 				})
 			})
 		})
