@@ -117,7 +117,6 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 
 	vcapServices := os.Getenv("VCAP_SERVICES")
 	if !strings.Contains(vcapServices, `"credhub-ref"`) {
-		fmt.Fprintf(os.Stderr, "VCAP_SERVICES does not have any credhub-ref values")
 		return
 	}
 
