@@ -15,6 +15,7 @@ import (
 
 	"github.com/cloudfoundry-incubator/credhub-cli/credhub"
 
+	"code.cloudfoundry.org/buildpackapplifecycle/databaseuri"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 )
 
@@ -44,6 +45,7 @@ func main() {
 	}
 
 	interpolateVCAPServices(platformOptions)
+	setDatabaseURL()
 
 	vcapAppEnv := map[string]interface{}{}
 
@@ -107,6 +109,27 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to run: %s", err)
 		os.Exit(1)
+	}
+}
+
+func setDatabaseURL() {
+	vcapServices := os.Getenv("VCAP_SERVICES")
+	if vcapServices == "" {
+		return
+	}
+
+	databaseURI := databaseuri.New()
+	creds, err := databaseURI.Credentials([]byte(vcapServices))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Cannot parse vcap services: %s", err)
+		return
+	}
+	uri := databaseURI.Uri(creds)
+	if uri == "" {
+		return
+	}
+	if err := os.Setenv("DATABASE_URL", uri); err != nil {
+		panic(err)
 	}
 }
 

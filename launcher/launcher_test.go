@@ -21,6 +21,24 @@ import (
 )
 
 var _ = Describe("Launcher", func() {
+	const (
+		vcapServicesWithDB = `{
+  "user-provided": [
+   {
+    "credentials": {
+		 "uri": "mysql://username:password@host:port/db"
+    },
+    "label": "user-provided",
+    "name": "my-db-mine",
+    "syslog_drain_url": "",
+    "tags": [],
+    "volume_mounts": []
+   }
+  ]
+ }
+`
+	)
+
 	var (
 		appDir      string
 		launcherCmd *exec.Cmd
@@ -183,13 +201,36 @@ var _ = Describe("Launcher", func() {
 							ghttp.CombineHandlers(
 								ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
 								ghttp.VerifyBody([]byte(vcapServicesValue)),
-								ghttp.RespondWith(http.StatusOK, "INTERPOLATED_JSON"),
+								ghttp.RespondWith(http.StatusOK, `{"some-service":[]}`),
 							))
 					})
 
 					It("updates VCAP_SERVICES with the interpolated content", func() {
 						Eventually(session).Should(gexec.Exit(0))
-						Eventually(session.Out).Should(gbytes.Say("VCAP_SERVICES=INTERPOLATED_JSON"))
+						Eventually(session.Out).Should(gbytes.Say(`VCAP_SERVICES={"some-service":\[\]}`))
+					})
+				})
+
+				Context("and the vcap services has a database uri", func() {
+					BeforeEach(func() {
+						server.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
+								ghttp.VerifyBody([]byte(vcapServicesValue)),
+								ghttp.RespondWith(http.StatusOK, vcapServicesWithDB),
+							))
+
+						launcherCmd.Args = []string{
+							"launcher",
+							appDir,
+							"echo $DATABASE_URL",
+							"{}",
+						}
+					})
+
+					It("includes the database uri as extracted from the interpolated VCAP_SERVICES", func() {
+						Eventually(session).Should(gexec.Exit(0))
+						Eventually(session.Out).Should(gbytes.Say("mysql2://username:password@host:port/db"))
 					})
 				})
 
