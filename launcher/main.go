@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -30,7 +32,7 @@ const (
 
 func main() {
 	if len(os.Args) < 4 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <ignored> <start command> <metadata> [<platform-options>]", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <ignored> <start command> <metadata>", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -147,17 +149,31 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 	keyPath := os.Getenv("CF_INSTANCE_KEY")
 	rootCAs := rootCAs()
 
-	ch, err := credhub.New(platformOptions.CredhubURI, credhub.ClientCert(certPath, keyPath), credhub.CaCerts(rootCAs...))
+	credhubURI := platformOptions.CredhubURI
+	_, err := url.ParseRequestURI(credhubURI)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid CredHub URI: '%s'", credhubURI)
+		os.Exit(4)
+	}
+
+	if certPath == "" || keyPath == "" {
+		fmt.Fprintf(os.Stderr, "Unable to load instance identity credentials; CF_INSTANCE_CERT: '%s', CF_INSTANCE_KEY: '%s'", certPath, keyPath)
+		os.Exit(4)
+	}
+
+	ch, err := credhub.New(credhubURI, credhub.ClientCert(certPath, keyPath), credhub.CaCerts(rootCAs...))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to create a credhub client: %s", err)
 		os.Exit(4)
 	}
 
 	interpolatedVcapServices, err := ch.InterpolateString(vcapServices)
+
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to interpolate credhub references: %s", err)
+		fmt.Fprintf(os.Stderr, formatCredHubErrorMessage(err))
 		os.Exit(4)
 	}
+
 	err = os.Setenv("VCAP_SERVICES", interpolatedVcapServices)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Cannot set environment variable: %s", err)
@@ -195,5 +211,18 @@ func platformOptions() (*PlatformOptions, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &platformOptions, nil
+}
+
+func formatCredHubErrorMessage(err error) string {
+	if typeErr, ok := err.(x509.UnknownAuthorityError); ok {
+		return fmt.Sprintf("Unable to verify CredHub server: %s", typeErr)
+	}
+
+	if typeErr, ok := err.(*url.Error); ok {
+		return formatCredHubErrorMessage(typeErr.Err)
+	}
+
+	return fmt.Sprintf("Unable to interpolate credhub references: %s", err)
 }

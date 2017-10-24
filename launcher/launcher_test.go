@@ -184,6 +184,7 @@ var _ = Describe("Launcher", func() {
 			})
 
 			Context("when the credhub location is passed to the launcher", func() {
+				var credhubURI string
 				BeforeEach(func() {
 					launcherCmd.Args = []string{
 						"launcher",
@@ -191,7 +192,8 @@ var _ = Describe("Launcher", func() {
 						startCommand,
 						"{}",
 					}
-					credhubLocation := `{ "credhub-uri": "` + server.URL() + `"}`
+					credhubURI = server.URL()
+					credhubLocation := `{ "credhub-uri": "` + credhubURI + `"}`
 					launcherCmd.Env = append(launcherCmd.Env, "VCAP_PLATFORM_OPTIONS="+credhubLocation)
 				})
 
@@ -234,31 +236,32 @@ var _ = Describe("Launcher", func() {
 					})
 				})
 
-				Context("when credhub interpolation fails", func() {
+				Context("when the launcher is passed an invalid credhub URI", func() {
 					BeforeEach(func() {
-						server.AppendHandlers(
-							ghttp.CombineHandlers(
-								ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
-								ghttp.VerifyBody([]byte(vcapServicesValue)),
-								ghttp.RespondWith(http.StatusInternalServerError, "{}"),
-							))
+						launcherCmd.Args = []string{
+							"launcher",
+							appDir,
+							startCommand,
+							"{}",
+						}
+						credhubLocation := `{ "credhub-uri": "https/:notsovalid.com"}`
+						launcherCmd.Env = append(launcherCmd.Env, "VCAP_PLATFORM_OPTIONS="+credhubLocation)
 					})
 
-					It("prints an error message", func() {
+					It("prints an error with the invalid URI", func() {
 						Eventually(session).Should(gexec.Exit(4))
-						Eventually(session.Err).Should(gbytes.Say("Unable to interpolate credhub references"))
+						Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("Invalid CredHub URI: '%s'", "https/:notsovalid.com")))
+					})
+				})
+
+				Context("when the launcher cannot connect to the credhub URI", func() {
+					BeforeEach(func() {
+						server.Close()
 					})
 
-					Context("and the app doesn't have credhub in its service bindings", func() {
-						BeforeEach(func() {
-							vcapServicesValue = `{"my-server":[{"credentials":{"other-cred-manager":"(//my-server/creds)"}}]}`
-							launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
-						})
-
-						It("launches the app successfully", func() {
-							Eventually(session).Should(gexec.Exit(0))
-							Eventually(session.Out).Should(gbytes.Say(fmt.Sprintf("VCAP_SERVICES=%s", regexp.QuoteMeta(vcapServicesValue))))
-						})
+					It("prints an error indicating launcher cannot connect to credhub", func() {
+						Eventually(session).Should(gexec.Exit(4))
+						Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("connection refused")))
 					})
 				})
 
@@ -287,31 +290,90 @@ var _ = Describe("Launcher", func() {
 
 					It("returns an error", func() {
 						Eventually(session).Should(gexec.Exit(4))
+						Eventually(session.Err).Should(gbytes.Say("Unable to verify CredHub server"))
 						Eventually(session.Err).Should(gbytes.Say("certificate signed by unknown authority"))
 					})
 				})
 
-				Context("when no instance identity credentials are supplied", func() {
-					BeforeEach(func() {
-						launcherCmd.Env = append(launcherCmd.Env, "CF_INSTANCE_CERT=", "CF_INSTANCE_KEY=")
-					})
-
-					It("prints an error message", func() {
-						Eventually(session).Should(gexec.Exit(4))
-						Eventually(session.Err).Should(gbytes.Say("Unable to create a credhub client"))
-					})
-
-					Context("and the app doesn't have credhub in its service bindings", func() {
+				Context("when invalid instance identity credentials are supplied", func() {
+					Context("when one of the environment variables is not set", func() {
 						BeforeEach(func() {
-							vcapServicesValue = `{"my-server":[{"credentials":{"other-cred-manager":"(//my-server/creds)"}}]}`
-							launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
+							launcherCmd.Env = append(launcherCmd.Env, "CF_INSTANCE_CERT=")
 						})
 
-						It("launches the app successfully", func() {
-							Eventually(session).Should(gexec.Exit(0))
-							Eventually(session.Out).Should(gbytes.Say(fmt.Sprintf("VCAP_SERVICES=%s", regexp.QuoteMeta(vcapServicesValue))))
+						It("prints an error message", func() {
+							Eventually(session).Should(gexec.Exit(4))
+							Eventually(session.Err).Should(gbytes.Say("Unable to load instance identity credentials"))
 						})
 					})
+
+					Context("when unauthorized", func() {
+						BeforeEach(func() {
+							server.AppendHandlers(
+								ghttp.CombineHandlers(
+									ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
+									ghttp.VerifyBody([]byte(vcapServicesValue)),
+									ghttp.RespondWith(http.StatusUnauthorized, `{"error": "The provided certificate is not authorized to be used for client authentication."}`),
+								))
+						})
+
+						It("prints an error message", func() {
+							Eventually(session).Should(gexec.Exit(4))
+							Eventually(session.Err).Should(gbytes.Say("Unable to interpolate credhub references: The provided certificate is not authorized to be used for client authentication."))
+						})
+					})
+
+					Context("when no instance identity credentials are supplied", func() {
+						BeforeEach(func() {
+							launcherCmd.Env = append(launcherCmd.Env, "CF_INSTANCE_CERT=", "CF_INSTANCE_KEY=")
+						})
+
+						It("prints an error message", func() {
+							Eventually(session).Should(gexec.Exit(4))
+							Eventually(session.Err).Should(gbytes.Say("Unable to load instance identity credentials"))
+						})
+
+						Context("and the app doesn't have credhub in its service bindings", func() {
+							BeforeEach(func() {
+								vcapServicesValue = `{"my-server":[{"credentials":{"other-cred-manager":"(//my-server/creds)"}}]}`
+								launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
+							})
+
+							It("launches the app successfully", func() {
+								Eventually(session).Should(gexec.Exit(0))
+								Eventually(session.Out).Should(gbytes.Say(fmt.Sprintf("VCAP_SERVICES=%s", regexp.QuoteMeta(vcapServicesValue))))
+							})
+						})
+					})
+
+					Context("when credhub interpolation fails on any other error case", func() {
+						BeforeEach(func() {
+							server.AppendHandlers(
+								ghttp.CombineHandlers(
+									ghttp.VerifyRequest("POST", "/api/v1/interpolate"),
+									ghttp.VerifyBody([]byte(vcapServicesValue)),
+									ghttp.RespondWith(http.StatusInternalServerError, "{}"),
+								))
+						})
+
+						It("prints an error message", func() {
+							Eventually(session).Should(gexec.Exit(4))
+							Eventually(session.Err).Should(gbytes.Say("Unable to interpolate credhub references"))
+						})
+
+						Context("and the app doesn't have credhub in its service bindings", func() {
+							BeforeEach(func() {
+								vcapServicesValue = `{"my-server":[{"credentials":{"other-cred-manager":"(//my-server/creds)"}}]}`
+								launcherCmd.Env = append(launcherCmd.Env, fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))
+							})
+
+							It("launches the app successfully", func() {
+								Eventually(session).Should(gexec.Exit(0))
+								Eventually(session.Out).Should(gbytes.Say(fmt.Sprintf("VCAP_SERVICES=%s", regexp.QuoteMeta(vcapServicesValue))))
+							})
+						})
+					})
+
 				})
 			})
 
