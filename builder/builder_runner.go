@@ -11,7 +11,6 @@ import (
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
-	"github.com/containers/image/types"
 )
 
 type Builder struct {
@@ -64,19 +63,9 @@ func (builder Builder) build() <-chan error {
 	go func() {
 		defer close(errorChan)
 
-		ctx := &types.SystemContext{
-			DockerAuthConfig: &types.DockerAuthConfig{
-				Username: builder.DockerUser,
-				Password: builder.DockerPassword,
-			},
-		}
-		for _, insecure := range builder.InsecureDockerRegistries {
-			if builder.RegistryURL == insecure {
-				ctx.DockerInsecureSkipTLSVerify = true
-			}
-		}
+		credentials := basicCredentialStore{builder.DockerUser, builder.DockerPassword}
 
-		img, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, ctx, os.Stderr)
+		img, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, builder.InsecureDockerRegistries, credentials, os.Stderr)
 		if err != nil {
 			errorChan <- fmt.Errorf(
 				"failed to fetch metadata from [%s] with tag [%s] and insecure registries %s due to %s",

@@ -6,21 +6,29 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 
-	"code.cloudfoundry.org/cfhttp"
 	"code.cloudfoundry.org/dockerapplifecycle"
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
-	"github.com/containers/image/manifest"
-	"github.com/containers/image/types"
+	"github.com/docker/distribution/registry/client/auth"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 )
+
+type testCreds struct {
+	user     string
+	password string
+}
+
+func (t testCreds) Basic(url *url.URL) (string, string) {
+	return t.user, t.password
+}
 
 var _ = Describe("Builder helpers", func() {
 	var (
@@ -70,7 +78,6 @@ var _ = Describe("Builder helpers", func() {
 		server.AppendHandlers(
 			ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tagString),
-				ghttp.VerifyHeaderKV("Accept", manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType),
 				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					w.Header().Set("X-Docker-Token", "token-1,token-2")
 					w.Write([]byte(response))
@@ -127,8 +134,6 @@ var _ = Describe("Builder helpers", func() {
 		var repoName string
 		var tag string
 		var insecureRegistries []string
-		var ctx *types.SystemContext
-		var username, password string
 
 		BeforeEach(func() {
 			server = ghttp.NewUnstartedServer()
@@ -144,31 +149,11 @@ var _ = Describe("Builder helpers", func() {
 		})
 
 		JustBeforeEach(func() {
-			fixturesPath := path.Join(os.Getenv("GOPATH"), "src/code.cloudfoundry.org/dockerapplifecycle/helpers/fixtures")
-			tlsCA := path.Join(fixturesPath, "testCA.crt")
-			tlsCert := path.Join(fixturesPath, "localhost.cert")
-			tlsKey := path.Join(fixturesPath, "localhost.key")
-
-			ctx = &types.SystemContext{
-				DockerAuthConfig: &types.DockerAuthConfig{
-					Username: username,
-					Password: password,
-				},
-				DockerCertPath: fixturesPath,
+			if server.HTTPTestServer.TLS != nil {
+				server.HTTPTestServer.StartTLS()
+			} else {
+				server.Start()
 			}
-			for _, insecure := range insecureRegistries {
-				if registryURL == insecure {
-					ctx.DockerInsecureSkipTLSVerify = true
-				}
-			}
-
-			if server.HTTPTestServer.TLS == nil {
-				tlsConfig, err := cfhttp.NewTLSConfig(tlsCert, tlsKey, tlsCA)
-				Expect(err).NotTo(HaveOccurred())
-				tlsConfig.ClientAuth = tls.NoClientCert
-				server.HTTPTestServer.TLS = tlsConfig
-			}
-			server.HTTPTestServer.StartTLS()
 			var err error
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -180,7 +165,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -192,7 +177,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -205,7 +190,7 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -218,12 +203,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
@@ -241,7 +226,7 @@ var _ = Describe("Builder helpers", func() {
 
 			It("should retry 3 times", func() {
 				stderr := gbytes.NewBuffer()
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, stderr)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(stderr).To(gbytes.Say("retry attempt: 1"))
@@ -259,12 +244,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
@@ -279,12 +264,12 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the exposed ports", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img.Config).NotTo(BeNil())
 
 				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("tcp", "8080"), struct{}{}))
@@ -301,40 +286,28 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, nil, os.Stderr)
 				Expect(img).NotTo(BeNil())
 				Expect(img.Config).NotTo(BeNil())
 				Expect(img.Config.Cmd).NotTo(BeNil())
 				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 			})
-
-			Context("that is not in the insecureRegistries list", func() {
-				BeforeEach(func() {
-					insecureRegistries = []string{}
-				})
-
-				It("should error", func() {
-					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("https"))
-				})
-			})
 		})
 
 		Context("with a private registry with token authorization", func() {
+			var credStore auth.CredentialStore
 			BeforeEach(func() {
 				server = ghttp.NewUnstartedServer()
 				registryURL = server.Addr()
-				username = "username"
-				password = "password"
+				credStore = testCreds{"username", "password"}
 
 				authenticateHeader := http.Header{}
-				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token"`, registryURL))
+				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token"`, registryURL))
 				server.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/v2/"),
@@ -344,7 +317,7 @@ var _ = Describe("Builder helpers", func() {
 				server.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/token"),
-						ghttp.VerifyBasicAuth(username, password),
+						ghttp.VerifyBasicAuth("username", "password"),
 						ghttp.RespondWith(200, `{"token":"tokenstring"}`),
 					),
 				)
@@ -354,6 +327,7 @@ var _ = Describe("Builder helpers", func() {
 				BeforeEach(func() {
 					repoName = "some_user/some_repo"
 					tag = "some-tag"
+
 					server.AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
@@ -367,12 +341,12 @@ var _ = Describe("Builder helpers", func() {
 				})
 
 				It("should not error", func() {
-					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should return the top-most image layer metadata", func() {
-					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(img).NotTo(BeNil())
 					Expect(img.Config).NotTo(BeNil())
 					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
@@ -397,23 +371,26 @@ var _ = Describe("Builder helpers", func() {
 				})
 
 				It("should not error", func() {
-					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should return the top-most image layer metadata", func() {
-					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(img).NotTo(BeNil())
 					Expect(img.Config).NotTo(BeNil())
 					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
 				})
 			})
+
 		})
 
 		Context("with a private registry with basic authorization", func() {
+			var credStore auth.CredentialStore
 			BeforeEach(func() {
 				server = ghttp.NewUnstartedServer()
 				registryURL = server.Addr()
+				credStore = testCreds{"username", "password"}
 
 				authenticateHeader := http.Header{}
 				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="http://%s/token"`, registryURL))
@@ -432,7 +409,7 @@ var _ = Describe("Builder helpers", func() {
 
 					server.AppendHandlers(
 						ghttp.CombineHandlers(
-							ghttp.VerifyBasicAuth(username, password),
+							ghttp.VerifyBasicAuth("username", "password"),
 							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
 							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 								w.Header().Set("X-Docker-Token", "token-1,token-2")
@@ -443,12 +420,12 @@ var _ = Describe("Builder helpers", func() {
 				})
 
 				It("should not error", func() {
-					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should return the top-most image layer metadata", func() {
-					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, insecureRegistries, credStore, os.Stderr)
 					Expect(img).NotTo(BeNil())
 					Expect(img.Config).NotTo(BeNil())
 					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
