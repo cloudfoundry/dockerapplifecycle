@@ -1,30 +1,26 @@
 package helpers
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"path"
 	"strings"
-	"time"
-
-	"golang.org/x/net/context"
 
 	"code.cloudfoundry.org/dockerapplifecycle"
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
-	"github.com/docker/distribution/registry/client"
-	"github.com/docker/distribution/registry/client/auth"
-	"github.com/docker/distribution/registry/client/transport"
+	"github.com/containers/image/docker"
+	"github.com/containers/image/manifest"
+	"github.com/containers/image/types"
+	digest "github.com/opencontainers/go-digest"
 )
 
 const (
 	DockerHubHostname    = "registry-1.docker.io"
 	DockerHubLoginServer = "https://index.docker.io/v1/"
+	MAX_DOCKER_RETRIES   = 4
 )
 
 type Config struct {
@@ -37,6 +33,11 @@ type Config struct {
 
 type Image struct {
 	Config *Config `json:"config,omitempty"`
+}
+type dockerImage struct {
+	History []struct {
+		V1Compatibility string `json:"v1Compatibility,omitempty"`
+	} `json:"history,omitempty"`
 }
 
 // borrowed from docker/docker
@@ -87,54 +88,59 @@ func ParseRepositoryTag(repos string) (string, string) {
 	return repos, ""
 }
 
-func FetchMetadata(registryURL string, repoName string, tag string, insecureRegistries []string, credentials auth.CredentialStore, stderr io.Writer) (*Image, error) {
-	scheme := "https"
-	var err error
-	transport, err := makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials, stderr)
-	if err != nil {
-		scheme = "http"
-		transport, err = makeTransport(scheme, registryURL, repoName, insecureRegistries, credentials, stderr)
-		if err != nil {
-			return nil, err
-		}
+func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, stderr io.Writer) (*Image, error) {
+	manifest.DefaultRequestedManifestMIMETypes = []string{
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
 	}
-
-	repoClient, err := client.NewRepository(context.TODO(), repoName, scheme+"://"+registryURL, transport)
+	dockerRef := fmt.Sprintf("//%s/%s", registryURL, repoName)
+	ref, err := docker.ParseReference(dockerRef)
 	if err != nil {
-		fmt.Fprintln(stderr, "Failed making docker repository client:", err)
 		return nil, err
 	}
 
-	manifestService, err := repoClient.Manifests(context.TODO())
+	imgSrc, err := ref.NewImageSource(ctx)
 	if err != nil {
-		fmt.Fprintln(stderr, "Failed getting docker image manifests:", err)
 		return nil, err
 	}
+	defer imgSrc.Close()
 
-	// var manifest *manifest.SignedManifest
-	// var err2 error
-	manifest, err := manifestService.GetByTag(tag)
-	for i := 0; i <= 3; i++ {
-		if err != nil {
-			if i < 3 {
-				fmt.Fprintln(stderr, "Failed getting docker image by tag:", err, " Going to retry attempt:", i+1)
-				manifest, err = manifestService.GetByTag(tag)
-				continue
-			}
+	tagDigest := digest.Digest(tag)
+	// TODO: Retry logic
+	var v2s1Schema dockerImage
+	for i := 0; i < MAX_DOCKER_RETRIES; i++ {
+		var payload []byte
+		payload, _, err = imgSrc.GetManifest(&tagDigest)
+		if err != nil && i < MAX_DOCKER_RETRIES-1 {
+			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err, " Going to retry attempt:", i+1)
+			continue
+		} else if err != nil {
 			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err)
-			return nil, err
-		} else {
-			break
+			continue
 		}
+
+		err = json.Unmarshal(payload, &v2s1Schema)
+		if err != nil && i < MAX_DOCKER_RETRIES-1 {
+			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err, " Going to retry attempt:", i+1)
+			continue
+		} else if err != nil {
+			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err)
+			continue
+		}
+
+		break
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	var image Image
-	err = json.Unmarshal([]byte(manifest.History[0].V1Compatibility), &image)
+	err = json.Unmarshal([]byte(v2s1Schema.History[0].V1Compatibility), &image)
 	if err != nil {
 		fmt.Fprintln(stderr, "Failed parsing docker image JSON:", err)
 		return nil, err
 	}
-
 	return &image, nil
 }
 
@@ -175,61 +181,4 @@ func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error
 	}
 
 	return nil
-}
-
-func makeTransport(scheme, registryURL, repository string, insecureRegistries []string, credentialStore auth.CredentialStore, stderr io.Writer) (http.RoundTripper, error) {
-	baseTransport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).Dial,
-		DisableKeepAlives: true,
-	}
-
-	if scheme == "https" {
-		secure := true
-		for _, insecureRegistry := range insecureRegistries {
-			if registryURL == insecureRegistry {
-				secure = false
-				break
-			}
-		}
-
-		if !secure {
-			baseTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-		}
-	}
-
-	authTransport := transport.NewTransport(baseTransport)
-
-	pingClient := &http.Client{
-		Transport: authTransport,
-		Timeout:   5 * time.Second,
-	}
-
-	req, err := http.NewRequest("GET", scheme+"://"+registryURL+"/v2/", nil)
-	if err != nil {
-		return nil, err
-	}
-	challengeManager := auth.NewSimpleChallengeManager()
-
-	resp, err := pingClient.Do(req)
-	if err != nil {
-		fmt.Fprintln(stderr, "Failed to talk to docker registry:", err)
-		return nil, err
-	} else {
-		defer resp.Body.Close()
-		if err := challengeManager.AddResponse(resp); err != nil {
-			fmt.Fprintln(stderr, "Failed to talk to docker registry:", err)
-			return nil, err
-		}
-	}
-
-	tokenHandler := auth.NewTokenHandler(authTransport, credentialStore, repository, "pull")
-	basicHandler := auth.NewBasicHandler(credentialStore)
-	authorizer := auth.NewAuthorizer(challengeManager, tokenHandler, basicHandler)
-
-	return transport.NewTransport(baseTransport, authorizer), nil
 }
