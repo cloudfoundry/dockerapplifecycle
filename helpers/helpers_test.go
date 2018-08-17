@@ -144,7 +144,7 @@ var _ = Describe("Builder helpers", func() {
 		})
 
 		JustBeforeEach(func() {
-			fixturesPath := path.Join(os.Getenv("GOPATH"), "src/code.cloudfoundry.org/dockerapplifecycle/helpers/fixtures")
+			fixturesPath := path.Join(os.Getenv("TOPDIR"), "src/code.cloudfoundry.org/dockerapplifecycle/helpers/fixtures")
 			tlsCA := path.Join(fixturesPath, "testCA.crt")
 			tlsCert := path.Join(fixturesPath, "localhost.cert")
 			tlsKey := path.Join(fixturesPath, "localhost.key")
