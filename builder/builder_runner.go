@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -47,15 +46,6 @@ func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) err
 	}
 
 	return nil
-}
-
-type basicCredentialStore struct {
-	username string
-	password string
-}
-
-func (bcs basicCredentialStore) Basic(*url.URL) (string, string) {
-	return bcs.username, bcs.password
 }
 
 func (builder Builder) build() <-chan error {
