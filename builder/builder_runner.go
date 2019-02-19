@@ -66,7 +66,7 @@ func (builder Builder) build() <-chan error {
 			}
 		}
 
-		img, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, ctx, os.Stderr)
+		imgConfig, err := helpers.FetchMetadata(builder.RegistryURL, builder.RepoName, builder.Tag, ctx, os.Stderr)
 		if err != nil {
 			errorChan <- fmt.Errorf(
 				"failed to fetch metadata from [%s] with tag [%s] and insecure registries %s due to %s",
@@ -79,14 +79,14 @@ func (builder Builder) build() <-chan error {
 		}
 
 		info := protocol.DockerImageMetadata{}
-		if img.Config != nil {
-			info.ExecutionMetadata.Cmd = img.Config.Cmd
-			info.ExecutionMetadata.Entrypoint = img.Config.Entrypoint
-			info.ExecutionMetadata.Workdir = img.Config.WorkingDir
-			info.ExecutionMetadata.User = img.Config.User
-			info.ExecutionMetadata.ExposedPorts, err = extractPorts(img.Config.ExposedPorts)
+		if imgConfig != nil {
+			info.ExecutionMetadata.Cmd = imgConfig.Cmd
+			info.ExecutionMetadata.Entrypoint = imgConfig.Entrypoint
+			info.ExecutionMetadata.Workdir = imgConfig.WorkingDir
+			info.ExecutionMetadata.User = imgConfig.User
+			info.ExecutionMetadata.ExposedPorts, err = extractPorts(convertPortsToNatPorts(imgConfig.ExposedPorts))
 			if err != nil {
-				portDetails := fmt.Sprintf("%v", img.Config.ExposedPorts)
+				portDetails := fmt.Sprintf("%v", imgConfig.ExposedPorts)
 				println("failed to parse image ports", portDetails, err.Error())
 				errorChan <- err
 				return
@@ -115,6 +115,16 @@ func (builder Builder) build() <-chan error {
 	}()
 
 	return errorChan
+}
+
+func convertPortsToNatPorts(ports map[string]struct{}) map[nat.Port]struct{} {
+	natPorts := map[nat.Port]struct{}{}
+	for portProto, v := range ports {
+		proto, port := nat.SplitProtoPort(portProto)
+		p := nat.NewPort(proto, port)
+		natPorts[p] = v
+	}
+	return natPorts
 }
 
 func extractPorts(dockerPorts map[nat.Port]struct{}) (exposedPorts []protocol.Port, err error) {

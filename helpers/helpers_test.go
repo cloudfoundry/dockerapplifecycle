@@ -11,7 +11,6 @@ import (
 
 	"code.cloudfoundry.org/cfhttp"
 	"code.cloudfoundry.org/dockerapplifecycle"
-	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 	"github.com/containers/image/manifest"
@@ -20,62 +19,276 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
+	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+type serverResponseConfig struct {
+	ImageConfig            v1.ImageConfig
+	ImageTag               string
+	WithPrivateRegistry    bool
+	WithSlowImageConfig    bool
+	WithSlowImageManifest  bool
+	WithTokenAuthorization bool
+	WithBasicAuthorization bool
+}
+
 var _ = Describe("Builder helpers", func() {
-	var (
-		response string
-		server   *ghttp.Server
-	)
+	var server *ghttp.Server
 
-	BeforeEach(func() {
-		bs, err := ioutil.ReadFile("manifest.yml")
-		Expect(err).NotTo(HaveOccurred())
-		response = string(bs)
-	})
-
-	setupPingableRegistry := func() {
+	v2Schema1Manifest := func(serverConfig serverResponseConfig) {
+		json := `
+{
+   "schemaVersion": 1,
+   "name": "cloudfoundry/diego-docker-app",
+   "tag": "latest",
+   "architecture": "amd64",
+   "fsLayers": [
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:c7b0764dcaa8ce81ef7e949b8029195dd763182cf45df5bfd62983797c62d8bd"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:6dbfe8710faa57533c018007eaabefd7d83c0b705ef2faa6c6f35d0e67da4bc6"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+      },
+      {
+         "blobSum": "sha256:add3ddb21edebb102b552fc129273216bf6312f5f1519d7c1401864a2810738b"
+      }
+   ],
+   "history": [
+      {
+         "v1Compatibility": "{\"architecture\":\"amd64\",\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"config\":{\"Hostname\":\"5fd1ff7f1c41\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/myapp/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"dockerapp\"],\"ArgsEscaped\":true,\"Image\":\"sha256:a0a486475836a2512e6a2ca6b1f8a41eedf50be2492ad98143f299649f4941d1\",\"Volumes\":null,\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"OnBuild\":[],\"Labels\":{}},\"container\":\"f4591248d8558a17d793015c0d7ed759c61af4c5b2bcb92c330797a8033a5e38\",\"container_config\":{\"Hostname\":\"5fd1ff7f1c41\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"ExposedPorts\":{\"8080/tcp\":{}},\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/myapp/bin\",\"VCAP_APPLICATION={}\",\"BAD_QUOTE='\",\"BAD_SHELL=$1\",\"HOME=/home/some_docker_user\",\"SOME_VAR=some_docker_value\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) \",\"CMD [\\\"dockerapp\\\"]\"],\"ArgsEscaped\":true,\"Image\":\"sha256:a0a486475836a2512e6a2ca6b1f8a41eedf50be2492ad98143f299649f4941d1\",\"Volumes\":null,\"WorkingDir\":\"/myapp\",\"Entrypoint\":null,\"OnBuild\":[],\"Labels\":{}},\"created\":\"2017-10-18T16:36:09.414939809Z\",\"docker_version\":\"17.05.0-ce\",\"id\":\"e7d3549e7b27af175c403021174c60d7abef583e04776ace50c75f6d69a29b2e\",\"os\":\"linux\",\"parent\":\"f8cbcf226d6a01a5ebb15b8390cff83b8b5dffc226761e968f9d3a01312551b9\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"f8cbcf226d6a01a5ebb15b8390cff83b8b5dffc226761e968f9d3a01312551b9\",\"parent\":\"9e1ba4e8dbf925ac47b982f24c2f156ae394f7f2571ec411e31b5b367824651c\",\"created\":\"2017-10-18T16:36:08.719100141Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c adduser -D vcap\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\"}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"9e1ba4e8dbf925ac47b982f24c2f156ae394f7f2571ec411e31b5b367824651c\",\"parent\":\"8685b78dbd9fc22dea58974c96d753b0ca0604368eed6107dcce7abdd4626eb0\",\"created\":\"2017-10-18T16:36:05.25752693Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) WORKDIR /myapp\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"8685b78dbd9fc22dea58974c96d753b0ca0604368eed6107dcce7abdd4626eb0\",\"parent\":\"1b44caaf935ecccfdd03d89bf0ebd0a4e76b0f168402f01b3cecab664daee7bc\",\"created\":\"2017-10-18T16:36:04.333209162Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) COPY file:ef22e82646058a157c84bdaaec02c987845793bea1a98c1b7d74d0f27f7b68df in /myapp/bin/dockerapp \"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\"}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"1b44caaf935ecccfdd03d89bf0ebd0a4e76b0f168402f01b3cecab664daee7bc\",\"parent\":\"e033d6187f812fd1722312764f80e7fa0974575f7cf613a6faf28ab8b325523b\",\"created\":\"2017-10-18T16:36:03.193549148Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  EXPOSE 8080/tcp\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"e033d6187f812fd1722312764f80e7fa0974575f7cf613a6faf28ab8b325523b\",\"parent\":\"8350b6ca18c1c41a2e07042439e8f217c1275a540deaf5c730b05360722af670\",\"created\":\"2017-10-18T16:36:02.213855538Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/myapp/bin\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"8350b6ca18c1c41a2e07042439e8f217c1275a540deaf5c730b05360722af670\",\"parent\":\"49a0e8685cd1ec97f8ef816b5eea34cb2a88ea7e078892f4be654aa4533bf208\",\"created\":\"2017-10-18T16:36:01.197619326Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  ENV SOME_VAR=some_docker_value\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"49a0e8685cd1ec97f8ef816b5eea34cb2a88ea7e078892f4be654aa4533bf208\",\"parent\":\"c222acf717e0aec1d4bf72d7766246fe51de88c507b2a3c37c29e66e6ab8688c\",\"created\":\"2017-10-18T16:36:00.197858282Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  ENV HOME=/home/some_docker_user\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"c222acf717e0aec1d4bf72d7766246fe51de88c507b2a3c37c29e66e6ab8688c\",\"parent\":\"00cbb9f2d7526b727d5100a8c10b773e7f78c169e4cfb68e4e48dce9e3fc13f0\",\"created\":\"2017-10-18T16:35:59.97446728Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  ENV BAD_SHELL=$1\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"00cbb9f2d7526b727d5100a8c10b773e7f78c169e4cfb68e4e48dce9e3fc13f0\",\"parent\":\"292c3a2179c41e490f3d81f407e8c4ba5fd71b32fd3a755740932359194a830e\",\"created\":\"2017-10-18T16:35:57.247129913Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  ENV BAD_QUOTE='\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"292c3a2179c41e490f3d81f407e8c4ba5fd71b32fd3a755740932359194a830e\",\"parent\":\"a4dbe56c2172a4b4032e22486425f430190be90301d5cede87f483456218f21b\",\"created\":\"2017-10-18T16:35:56.194954801Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  ENV VCAP_APPLICATION={}\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"a4dbe56c2172a4b4032e22486425f430190be90301d5cede87f483456218f21b\",\"parent\":\"79896794f176d957c647e79688a575fd1ccd897d00793d79fd2ba87fd8f38db0\",\"created\":\"2017-10-18T16:35:55.673329246Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  MAINTAINER https://github.com/cloudfoundry-incubator/diego-dockerfiles\"]},\"author\":\"https://github.com/cloudfoundry-incubator/diego-dockerfiles\",\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"79896794f176d957c647e79688a575fd1ccd897d00793d79fd2ba87fd8f38db0\",\"parent\":\"4560cca0c1f213ea635329144073cb0d7ba6736bfadc12246a46564b2ccd1ca6\",\"created\":\"2017-09-13T10:14:16.620085795Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  CMD [\\\"sh\\\"]\"]},\"throwaway\":true}"
+      },
+      {
+         "v1Compatibility": "{\"id\":\"4560cca0c1f213ea635329144073cb0d7ba6736bfadc12246a46564b2ccd1ca6\",\"created\":\"2017-09-13T10:14:16.436015799Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) ADD file:645231abe6e10e7282a6e78b49723a3ba35b62741fc08228b4086ffb95128f98 in / \"]}}"
+      }
+   ],
+   "signatures": [
+      {
+         "header": {
+            "jwk": {
+               "crv": "P-256",
+               "kid": "7EPZ:A6ZJ:NPFY:EVMW:OARM:XU3W:KFX4:KECJ:43LF:MSJ7:WSGX:XEKO",
+               "kty": "EC",
+               "x": "YThbbdERZsLizuJrzpZZSBiFhjw9CniQn_rn8_vXO28",
+               "y": "76Ye0shPacLrI7xblR0ICXTS9hfgjVnN0Ar5Fq4ANdU"
+            },
+            "alg": "ES256"
+         },
+         "signature": "e-QO7mMcDWuR4eMu5yYZBe2e0D71IZP-gQvsXeZ-16jf2nPGaQM0VXf6T2es8Pmu-U09dnu1FtT1iMc-2Yo9lQ",
+         "protected": "eyJmb3JtYXRMZW5ndGgiOjkwNTIsImZvcm1hdFRhaWwiOiJDbjAiLCJ0aW1lIjoiMjAxNy0xMC0xOVQxNTo0MToyM1oifQ"
+      }
+   ]
+}
+`
 		server.AllowUnhandledRequests = true
 		server.AppendHandlers(
 			ghttp.VerifyRequest("GET", "/v2/"),
 		)
-	}
-
-	setupSlowRegistry := func(tag ...string) {
-		tagString := "latest"
-		if len(tag) > 0 {
-			tagString = tag[0]
-		}
 
 		server.AppendHandlers(
-			ghttp.RespondWith(200, "Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection."),
-			ghttp.RespondWith(200, "Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection."),
-			ghttp.RespondWith(200, "Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection."),
 			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tagString),
+				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+serverConfig.ImageTag),
+				ghttp.VerifyHeaderKV(
+					"Accept",
+					manifest.DockerV2Schema2MediaType,
+					manifest.DockerV2Schema1SignedMediaType,
+					manifest.DockerV2Schema1MediaType,
+				),
 				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					w.Header().Set("X-Docker-Token", "token-1,token-2")
-					w.Write([]byte(response))
+					w.Header().Set("Content-Type", manifest.DockerV2Schema1MediaType)
+					w.Write([]byte(json))
 				}),
 			),
 		)
 	}
 
-	setupRegistry := func(tag ...string) {
-		tagString := "latest"
-		if len(tag) > 0 {
-			tagString = tag[0]
+	v2Schema2Manifest := func(serverConfig serverResponseConfig) {
+		if serverConfig.WithTokenAuthorization {
+			authenticateHeader := http.Header{}
+			authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token"`, server.Addr()))
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/v2/"),
+					ghttp.RespondWith(401, "", authenticateHeader),
+				),
+			)
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/token"),
+					ghttp.VerifyBasicAuth("username", "password"),
+					ghttp.RespondWith(200, `{"token":"tokenstring"}`),
+				),
+			)
+		} else if serverConfig.WithBasicAuthorization {
+			authenticateHeader := http.Header{}
+			authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="http://%s/token"`, server.Addr()))
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/v2/"),
+					ghttp.RespondWith(401, "", authenticateHeader),
+				),
+			)
+		} else {
+			server.AllowUnhandledRequests = true
+			server.AppendHandlers(
+				ghttp.VerifyRequest("GET", "/v2/"),
+			)
 		}
 
-		server.AppendHandlers(
-			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tagString),
-				ghttp.VerifyHeaderKV("Accept", manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType),
-				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Header().Set("X-Docker-Token", "token-1,token-2")
-					w.Write([]byte(response))
-				}),
+		config := v1.Image{
+			Config: serverConfig.ImageConfig,
+		}
+
+		configBytes, err := json.Marshal(config)
+		Expect(err).ToNot(HaveOccurred())
+		configDigest := digest.FromBytes(configBytes)
+
+		m := manifest.Schema2{
+			SchemaVersion: 2,
+			MediaType:     manifest.DockerV2Schema2MediaType,
+			ConfigDescriptor: manifest.Schema2Descriptor{
+				MediaType: manifest.DockerV2Schema2ConfigMediaType,
+				Size:      int64(len(configBytes)),
+				Digest:    configDigest,
+			},
+		}
+		manifestBytes, err := json.Marshal(m)
+		Expect(err).ToNot(HaveOccurred())
+
+		if serverConfig.WithSlowImageManifest {
+			server.AppendHandlers(
+				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+			)
+		}
+		verifyRequests := []http.HandlerFunc{
+			ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+serverConfig.ImageTag),
+			ghttp.VerifyHeaderKV(
+				"Accept",
+				manifest.DockerV2Schema2MediaType,
+				manifest.DockerV2Schema1SignedMediaType,
+				manifest.DockerV2Schema1MediaType,
 			),
+			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("X-Docker-Token", "token-1,token-2")
+				w.Header().Set("Content-Type", manifest.DockerV2Schema2MediaType)
+				w.Write(manifestBytes)
+			}),
+		}
+		if serverConfig.WithTokenAuthorization {
+			verifyRequests = append(
+				verifyRequests,
+				ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
+			)
+		}
+		if serverConfig.WithBasicAuthorization {
+			verifyRequests = append(
+				verifyRequests,
+				ghttp.VerifyBasicAuth("username", "password"),
+			)
+		}
+		server.AppendHandlers(
+			ghttp.CombineHandlers(verifyRequests...),
+		)
+		if serverConfig.WithSlowImageConfig {
+			server.AppendHandlers(
+				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+			)
+		}
+		verifyRequests = []http.HandlerFunc{
+			ghttp.VerifyRequest("GET", fmt.Sprintf("/v2/some_user/some_repo/blobs/%s", configDigest)),
+			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("X-Docker-Token", "token-1,token-2")
+				w.Write([]byte(configBytes))
+			}),
+		}
+		if serverConfig.WithTokenAuthorization {
+			verifyRequests = append(
+				verifyRequests,
+				ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
+			)
+		}
+		if serverConfig.WithBasicAuthorization {
+			verifyRequests = append(
+				verifyRequests,
+				ghttp.VerifyBasicAuth("username", "password"),
+			)
+		}
+		server.AppendHandlers(
+			ghttp.CombineHandlers(verifyRequests...),
 		)
 	}
 
@@ -128,16 +341,13 @@ var _ = Describe("Builder helpers", func() {
 		var tag string
 		var insecureRegistries []string
 		var ctx *types.SystemContext
-		var username, password string
 
 		BeforeEach(func() {
 			server = ghttp.NewUnstartedServer()
 
-			setupPingableRegistry()
-
 			registryURL = server.Addr()
 
-			repoName = ""
+			repoName = "some_user/some_repo"
 			tag = "latest"
 
 			insecureRegistries = []string{}
@@ -151,8 +361,8 @@ var _ = Describe("Builder helpers", func() {
 
 			ctx = &types.SystemContext{
 				DockerAuthConfig: &types.DockerAuthConfig{
-					Username: username,
-					Password: password,
+					Username: "username",
+					Password: "password",
 				},
 				DockerCertPath: fixturesPath,
 			}
@@ -176,7 +386,6 @@ var _ = Describe("Builder helpers", func() {
 		Context("with an invalid host", func() {
 			BeforeEach(func() {
 				registryURL = "qewr:5431"
-				repoName = "some_user/some_repo"
 			})
 
 			It("should error", func() {
@@ -200,7 +409,6 @@ var _ = Describe("Builder helpers", func() {
 		Context("with an unknown tag", func() {
 			BeforeEach(func() {
 				server.AllowUnhandledRequests = true
-				repoName = "some_user/some_repo"
 				tag = "not_some_tag"
 			})
 
@@ -211,32 +419,53 @@ var _ = Describe("Builder helpers", func() {
 		})
 
 		Context("with a valid repository reference", func() {
-			BeforeEach(func() {
-				setupRegistry()
+			Context("with manifest schema 1", func() {
+				BeforeEach(func() {
+					v2Schema1Manifest(serverResponseConfig{ImageTag: "latest"})
+				})
 
-				repoName = "some_user/some_repo"
+				It("should not error", func() {
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return the top-most image layer metadata", func() {
+					imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					Expect(imgConfig).NotTo(BeNil())
+					Expect(imgConfig.Cmd).NotTo(BeNil())
+					Expect(imgConfig.Cmd).To(Equal([]string{"dockerapp"}))
+				})
 			})
 
-			It("should not error", func() {
-				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-				Expect(err).NotTo(HaveOccurred())
-			})
+			Context("with manifest schema 2", func() {
+				BeforeEach(func() {
+					v2Schema2Manifest(serverResponseConfig{
+						ImageConfig: v1.ImageConfig{Cmd: []string{"dockerapp"}},
+						ImageTag:    "latest",
+					})
+				})
 
-			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-				Expect(img).NotTo(BeNil())
-				Expect(img.Config).NotTo(BeNil())
-				Expect(img.Config.Cmd).NotTo(BeNil())
-				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
+				It("should not error", func() {
+					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return the top-most image layer metadata", func() {
+					imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					Expect(imgConfig).NotTo(BeNil())
+					Expect(imgConfig.Cmd).NotTo(BeNil())
+					Expect(imgConfig.Cmd).To(Equal([]string{"dockerapp"}))
+				})
 			})
 		})
 
-		Context("when the network connection is slow", func() {
+		Context("when the network connection is slow getting the image manifest", func() {
 			BeforeEach(func() {
-				repoName = "some_user/some_repo"
-				tag = "some-tag"
-
-				setupSlowRegistry(tag)
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig:           v1.ImageConfig{},
+					ImageTag:              tag,
+					WithSlowImageManifest: true,
+				})
 			})
 
 			It("should retry 3 times", func() {
@@ -244,18 +473,38 @@ var _ = Describe("Builder helpers", func() {
 				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, stderr)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(stderr).To(gbytes.Say("retry attempt: 1"))
-				Expect(stderr).To(gbytes.Say("retry attempt: 2"))
-				Expect(stderr).To(gbytes.Say("retry attempt: 3"))
+				Expect(stderr).To(gbytes.Say(`Failed getting docker image manifest by tag: .* retry attempt: 1`))
+				Expect(stderr).To(gbytes.Say(`Failed getting docker image manifest by tag: .* retry attempt: 2`))
+				Expect(stderr).To(gbytes.Say(`Failed getting docker image manifest by tag: .* retry attempt: 3`))
+			})
+		})
+
+		Context("when the network connection is slow getting the image config", func() {
+			BeforeEach(func() {
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig:         v1.ImageConfig{},
+					ImageTag:            tag,
+					WithSlowImageConfig: true,
+				})
+			})
+
+			It("should retry 3 times", func() {
+				stderr := gbytes.NewBuffer()
+				_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, stderr)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(stderr).To(gbytes.Say(`Failed getting docker image config by tag: .* retry attempt: 1`))
+				Expect(stderr).To(gbytes.Say(`Failed getting docker image config by tag: .* retry attempt: 2`))
+				Expect(stderr).To(gbytes.Say(`Failed getting docker image config by tag: .* retry attempt: 3`))
 			})
 		})
 
 		Context("with a valid repository:tag reference", func() {
 			BeforeEach(func() {
-				repoName = "some_user/some_repo"
-				tag = "some-tag"
-
-				setupRegistry(tag)
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig: v1.ImageConfig{Cmd: []string{"dockerapp"}},
+					ImageTag:    tag,
+				})
 			})
 
 			It("should not error", func() {
@@ -264,18 +513,18 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-				Expect(img).NotTo(BeNil())
-				Expect(img.Config).NotTo(BeNil())
-				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
+				imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				Expect(imgConfig).NotTo(BeNil())
+				Expect(imgConfig.Cmd).To(Equal([]string{"dockerapp"}))
 			})
 		})
 
 		Context("when the image exposes custom ports", func() {
 			BeforeEach(func() {
-				setupRegistry()
-
-				repoName = "some_user/some_repo"
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig: v1.ImageConfig{ExposedPorts: map[string]struct{}{"8080/tcp": {}}},
+					ImageTag:    tag,
+				})
 			})
 
 			It("should not error", func() {
@@ -284,20 +533,20 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should return the exposed ports", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-				Expect(img.Config).NotTo(BeNil())
-
-				Expect(img.Config.ExposedPorts).To(HaveKeyWithValue(nat.NewPort("tcp", "8080"), struct{}{}))
+				imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				Expect(imgConfig).NotTo(BeNil())
+				Expect(imgConfig.ExposedPorts).To(HaveKeyWithValue("8080/tcp", struct{}{}))
 			})
 		})
 
 		Context("with an insecure registry", func() {
 			BeforeEach(func() {
-				setupRegistry()
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig: v1.ImageConfig{Cmd: []string{"dockerapp"}},
+					ImageTag:    tag,
+				})
 				server.HTTPTestServer.TLS = &tls.Config{InsecureSkipVerify: false}
 				insecureRegistries = append(insecureRegistries, server.Addr())
-
-				repoName = "some_user/some_repo"
 			})
 
 			It("should not error", func() {
@@ -306,11 +555,10 @@ var _ = Describe("Builder helpers", func() {
 			})
 
 			It("should return the top-most image layer metadata", func() {
-				img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-				Expect(img).NotTo(BeNil())
-				Expect(img.Config).NotTo(BeNil())
-				Expect(img.Config.Cmd).NotTo(BeNil())
-				Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
+				imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+				Expect(imgConfig).NotTo(BeNil())
+				Expect(imgConfig.Cmd).NotTo(BeNil())
+				Expect(imgConfig.Cmd).To(Equal([]string{"dockerapp"}))
 			})
 
 			Context("that is not in the insecureRegistries list", func() {
@@ -328,130 +576,46 @@ var _ = Describe("Builder helpers", func() {
 
 		Context("with a private registry with token authorization", func() {
 			BeforeEach(func() {
-				server = ghttp.NewUnstartedServer()
-				registryURL = server.Addr()
-				username = "username"
-				password = "password"
-
-				authenticateHeader := http.Header{}
-				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token"`, registryURL))
-				server.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/v2/"),
-						ghttp.RespondWith(401, "", authenticateHeader),
-					),
-				)
-				server.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/token"),
-						ghttp.VerifyBasicAuth(username, password),
-						ghttp.RespondWith(200, `{"token":"tokenstring"}`),
-					),
-				)
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig:            v1.ImageConfig{Cmd: []string{"dockerapp"}},
+					ImageTag:               tag,
+					WithTokenAuthorization: true,
+				})
 			})
 
 			Context("with a valid repository:tag reference", func() {
-				BeforeEach(func() {
-					repoName = "some_user/some_repo"
-					tag = "some-tag"
-					server.AppendHandlers(
-						ghttp.CombineHandlers(
-							ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
-							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
-							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-								w.Header().Set("X-Docker-Token", "token-1,token-2")
-								w.Write([]byte(response))
-							}),
-						),
-					)
-				})
-
 				It("should not error", func() {
 					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should return the top-most image layer metadata", func() {
-					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-					Expect(img).NotTo(BeNil())
-					Expect(img.Config).NotTo(BeNil())
-					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
-				})
-			})
-
-			Context("with a valid repository:tag reference", func() {
-				BeforeEach(func() {
-					repoName = "some_user/some_repo"
-					tag = "some-tag"
-
-					server.AppendHandlers(
-						ghttp.CombineHandlers(
-							ghttp.VerifyHeaderKV("Authorization", "Bearer tokenstring"),
-							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
-							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-								w.Header().Set("X-Docker-Token", "token-1,token-2")
-								w.Write([]byte(response))
-							}),
-						),
-					)
-				})
-
-				It("should not error", func() {
-					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				It("should return the top-most image layer metadata", func() {
-					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-					Expect(img).NotTo(BeNil())
-					Expect(img.Config).NotTo(BeNil())
-					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
+					imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					Expect(imgConfig).NotTo(BeNil())
+					Expect(imgConfig.Cmd).To(Equal([]string{"dockerapp"}))
 				})
 			})
 		})
 
 		Context("with a private registry with basic authorization", func() {
 			BeforeEach(func() {
-				server = ghttp.NewUnstartedServer()
-				registryURL = server.Addr()
-
-				authenticateHeader := http.Header{}
-				authenticateHeader.Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="http://%s/token"`, registryURL))
-				server.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/v2/"),
-						ghttp.RespondWith(401, "", authenticateHeader),
-					),
-				)
+				v2Schema2Manifest(serverResponseConfig{
+					ImageConfig:            v1.ImageConfig{Cmd: []string{"dockerapp"}},
+					ImageTag:               tag,
+					WithBasicAuthorization: true,
+				})
 			})
 
 			Context("with a valid repository:tag reference", func() {
-				BeforeEach(func() {
-					repoName = "some_user/some_repo"
-					tag = "some-tag"
-
-					server.AppendHandlers(
-						ghttp.CombineHandlers(
-							ghttp.VerifyBasicAuth(username, password),
-							ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+tag),
-							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-								w.Header().Set("X-Docker-Token", "token-1,token-2")
-								w.Write([]byte(response))
-							}),
-						),
-					)
-				})
-
 				It("should not error", func() {
 					_, err := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should return the top-most image layer metadata", func() {
-					img, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
-					Expect(img).NotTo(BeNil())
-					Expect(img.Config).NotTo(BeNil())
-					Expect(img.Config.Cmd).To(Equal([]string{"dockerapp"}))
+					imgConfig, _ := helpers.FetchMetadata(registryURL, repoName, tag, ctx, os.Stderr)
+					Expect(imgConfig).NotTo(BeNil())
+					Expect(imgConfig.Cmd).To(Equal([]string{"dockerapp"}))
 				})
 			})
 		})

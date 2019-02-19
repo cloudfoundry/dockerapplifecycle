@@ -9,12 +9,12 @@ import (
 	"strings"
 
 	"code.cloudfoundry.org/dockerapplifecycle"
-	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 	"github.com/containers/image/docker"
+	"github.com/containers/image/image"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -22,23 +22,6 @@ const (
 	DockerHubLoginServer = "https://index.docker.io/v1/"
 	MAX_DOCKER_RETRIES   = 4
 )
-
-type Config struct {
-	User         string
-	ExposedPorts map[nat.Port]struct{}
-	Cmd          []string
-	WorkingDir   string
-	Entrypoint   []string
-}
-
-type Image struct {
-	Config *Config `json:"config,omitempty"`
-}
-type dockerImage struct {
-	History []struct {
-		V1Compatibility string `json:"v1Compatibility,omitempty"`
-	} `json:"history,omitempty"`
-}
 
 // borrowed from docker/docker
 func splitReposName(reposName string) (string, string) {
@@ -88,15 +71,17 @@ func ParseRepositoryTag(repos string) (string, string) {
 	return repos, ""
 }
 
-func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, stderr io.Writer) (*Image, error) {
-	manifest.DefaultRequestedManifestMIMETypes = []string{
-		manifest.DockerV2Schema1SignedMediaType,
-		manifest.DockerV2Schema1MediaType,
-	}
-	dockerRef := fmt.Sprintf("//%s/%s", registryURL, repoName)
+func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, stderr io.Writer) (*v1.ImageConfig, error) {
+	dockerRef := fmt.Sprintf("//%s/%s", registryURL, repoName+":"+tag)
 	ref, err := docker.ParseReference(dockerRef)
 	if err != nil {
 		return nil, err
+	}
+
+	manifest.DefaultRequestedManifestMIMETypes = []string{
+		manifest.DockerV2Schema2MediaType,
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
 	}
 
 	imgSrc, err := ref.NewImageSource(ctx)
@@ -105,26 +90,24 @@ func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, 
 	}
 	defer imgSrc.Close()
 
-	tagDigest := digest.Digest(tag)
-	// TODO: Retry logic
-	var v2s1Schema dockerImage
+	var imageConfig *v1.Image
 	for i := 0; i < MAX_DOCKER_RETRIES; i++ {
-		var payload []byte
-		payload, _, err = imgSrc.GetManifest(&tagDigest)
+		var img types.Image
+		img, err = image.FromUnparsedImage(ctx, image.UnparsedInstance(imgSrc, nil))
 		if err != nil && i < MAX_DOCKER_RETRIES-1 {
-			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err, " Going to retry attempt:", i+1)
+			fmt.Fprintln(stderr, "Failed getting docker image manifest by tag:", err, " Going to retry attempt:", i+1)
 			continue
 		} else if err != nil {
-			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err)
+			fmt.Fprintln(stderr, "Failed getting docker image manifest by tag:", err)
 			continue
 		}
 
-		err = json.Unmarshal(payload, &v2s1Schema)
+		imageConfig, err = img.OCIConfig()
 		if err != nil && i < MAX_DOCKER_RETRIES-1 {
-			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err, " Going to retry attempt:", i+1)
+			fmt.Fprintln(stderr, "Failed getting docker image config by tag:", err, " Going to retry attempt:", i+1)
 			continue
 		} else if err != nil {
-			fmt.Fprintln(stderr, "Failed getting docker image by tag:", err)
+			fmt.Fprintln(stderr, "Failed getting docker image config by tag:", err)
 			continue
 		}
 
@@ -135,13 +118,7 @@ func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, 
 		return nil, err
 	}
 
-	var image Image
-	err = json.Unmarshal([]byte(v2s1Schema.History[0].V1Compatibility), &image)
-	if err != nil {
-		fmt.Fprintln(stderr, "Failed parsing docker image JSON:", err)
-		return nil, err
-	}
-	return &image, nil
+	return &imageConfig.Config, nil
 }
 
 func SaveMetadata(filename string, metadata *protocol.DockerImageMetadata) error {
