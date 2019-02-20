@@ -9,10 +9,10 @@ import (
 	"os"
 	"path"
 
-	"code.cloudfoundry.org/cfhttp"
 	"code.cloudfoundry.org/dockerapplifecycle"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
+	"code.cloudfoundry.org/tlsconfig"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	. "github.com/onsi/ginkgo"
@@ -373,7 +373,10 @@ var _ = Describe("Builder helpers", func() {
 			}
 
 			if server.HTTPTestServer.TLS == nil {
-				tlsConfig, err := cfhttp.NewTLSConfig(tlsCert, tlsKey, tlsCA)
+				tlsConfig, err := tlsconfig.Build(
+					tlsconfig.WithInternalServiceDefaults(),
+					tlsconfig.WithIdentityFromFile(tlsCert, tlsKey),
+				).Server(tlsconfig.WithClientAuthenticationFromFile(tlsCA))
 				Expect(err).NotTo(HaveOccurred())
 				tlsConfig.ClientAuth = tls.NoClientCert
 				server.HTTPTestServer.TLS = tlsConfig

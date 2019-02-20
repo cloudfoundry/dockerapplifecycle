@@ -11,8 +11,7 @@ import (
 	"path"
 	"regexp"
 
-	"code.cloudfoundry.org/cfhttp"
-
+	"code.cloudfoundry.org/tlsconfig"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -154,7 +153,10 @@ var _ = Describe("Launcher", func() {
 			serverKeyPath := path.Join(pwd(), "fixtures", "credhubserver.key")
 			caCertPath := path.Join(pwd(), "fixtures", "ca-certs", "credhubtest.crt")
 
-			tlsConfig, err := cfhttp.NewTLSConfig(serverCertPath, serverKeyPath, caCertPath)
+			tlsConfig, err := tlsconfig.Build(
+				tlsconfig.WithInternalServiceDefaults(),
+				tlsconfig.WithIdentityFromFile(serverCertPath, serverKeyPath),
+			).Server(tlsconfig.WithClientAuthenticationFromFile(caCertPath))
 			Expect(err).NotTo(HaveOccurred())
 			return tlsConfig
 		}
