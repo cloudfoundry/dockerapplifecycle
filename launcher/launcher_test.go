@@ -25,7 +25,7 @@ var _ = Describe("Launcher", func() {
   "user-provided": [
    {
     "credentials": {
-		 "uri": "mysql://username:password@host:port/db"
+		 "uri": "mysql://username:password@host:3333/db"
     },
     "label": "user-provided",
     "name": "my-db-mine",
@@ -234,7 +234,7 @@ var _ = Describe("Launcher", func() {
 
 					It("includes the database uri as extracted from the interpolated VCAP_SERVICES", func() {
 						Eventually(session).Should(gexec.Exit(0))
-						Eventually(session.Out).Should(gbytes.Say("mysql2://username:password@host:port/db"))
+						Eventually(session.Out).Should(gbytes.Say("mysql2://username:password@host:3333/db"))
 					})
 				})
 
