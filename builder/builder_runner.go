@@ -4,14 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
+	ecr "github.com/awslabs/amazon-ecr-credential-helper/ecr-login"
+	ecrapi "github.com/awslabs/amazon-ecr-credential-helper/ecr-login/api"
 	"github.com/containers/image/types"
 )
+
+const ECR_REPO_REGEX = `[a-zA-Z0-9][a-zA-Z0-9_-]*\.dkr\.ecr\.[a-zA-Z0-9][a-zA-Z0-9_-]*\.amazonaws\.com(\.cn)?[^ ]*`
 
 type Builder struct {
 	RegistryURL                string
@@ -54,10 +59,16 @@ func (builder Builder) build() <-chan error {
 	go func() {
 		defer close(errorChan)
 
+		username, password, err := builder.getCredentials()
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
 		ctx := &types.SystemContext{
 			DockerAuthConfig: &types.DockerAuthConfig{
-				Username: builder.DockerUser,
-				Password: builder.DockerPassword,
+				Username: username,
+				Password: password,
 			},
 		}
 		for _, insecure := range builder.InsecureDockerRegistries {
@@ -115,6 +126,40 @@ func (builder Builder) build() <-chan error {
 	}()
 
 	return errorChan
+}
+
+func (builder Builder) getCredentials() (string, string, error) {
+	username := builder.DockerUser
+	password := builder.DockerPassword
+
+	rECRRepo, err := regexp.Compile(ECR_REPO_REGEX)
+	if err != nil {
+		return "", "", fmt.Errorf(
+			"failed to compile ECR repo regex: %s",
+			err.Error(),
+		)
+	}
+
+	if rECRRepo.MatchString(builder.RegistryURL) {
+		os.Setenv("AWS_ACCESS_KEY_ID", builder.DockerUser)
+		os.Setenv("AWS_SECRET_ACCESS_KEY", builder.DockerPassword)
+
+		defer os.Unsetenv("AWS_ACCESS_KEY_ID")
+		defer os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+
+		username, password, err = ecr.ECRHelper{
+			ClientFactory: ecrapi.DefaultClientFactory{},
+		}.Get(builder.RegistryURL)
+		if err != nil {
+			return "", "", fmt.Errorf(
+				"failed to get ECR credentials from [%s] due to %s",
+				builder.RegistryURL,
+				err.Error(),
+			)
+		}
+	}
+
+	return username, password, nil
 }
 
 func convertPortsToNatPorts(ports map[string]struct{}) map[nat.Port]struct{} {

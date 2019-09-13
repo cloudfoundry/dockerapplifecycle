@@ -370,6 +370,37 @@ var _ = Describe("Building", func() {
 				})
 			})
 
+			Context("with an AWS ECR", func() {
+				BeforeEach(func() {
+					dockerUser = os.Getenv("ECR_TEST_AWS_ACCESS_KEY_ID")
+					dockerPassword = os.Getenv("ECR_TEST_AWS_SECRET_ACCESS_KEY")
+					dockerRef = os.Getenv("ECR_TEST_REPO_URI")
+
+					if dockerUser == "" ||
+						dockerPassword == "" ||
+						dockerRef == "" {
+						Skip("ECR_TEST_AWS_ACCESS_KEY_ID, ECR_TEST_AWS_SECRET_ACCESS_KEY and ECR_TEST_REPO_URI should be set")
+					}
+				})
+
+				It("should exit successfully", func() {
+					session := setupBuilder()
+					Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+				})
+
+				Describe("the json", func() {
+					It("should contain the execution metadata", func() {
+						session := setupBuilder()
+						Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+
+						result := resultJSON()
+
+						Expect(result).To(ContainSubstring(`"docker_image":"` + dockerRef + `:latest"`))
+						Expect(result).To(ContainSubstring(`\"entrypoint\":[\"/test-app\"]`))
+					})
+				})
+			})
+
 			Context("with a valid insecure docker registries", func() {
 				BeforeEach(func() {
 					parts, err := url.Parse(fakeDockerRegistry.URL())
