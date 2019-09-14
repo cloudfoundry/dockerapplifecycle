@@ -396,7 +396,8 @@ var _ = Describe("Building", func() {
 						result := resultJSON()
 
 						Expect(result).To(ContainSubstring(`"docker_image":"` + dockerRef + `:latest"`))
-						Expect(result).To(ContainSubstring(`\"entrypoint\":[\"/test-app\"]`))
+						Expect(result).To(ContainSubstring(`\"cmd\":[\"dockerapp\"]`))
+						Expect(result).To(ContainSubstring(`\"workdir\":\"/myapp\"`))
 					})
 				})
 			})
