@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
+	"code.cloudfoundry.org/ecrhelper"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
@@ -139,6 +140,7 @@ func main() {
 		DockerUser:                 *dockerUser,
 		DockerPassword:             *dockerPassword,
 		DockerEmail:                *dockerEmail,
+		ECRHelper:                  ecrhelper.NewECRHelper(),
 	}
 
 	members := grouper.Members{

@@ -4,15 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"time"
 
 	"code.cloudfoundry.org/dockerapplifecycle/docker/nat"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
-	ecr "github.com/awslabs/amazon-ecr-credential-helper/ecr-login"
-	ecrapi "github.com/awslabs/amazon-ecr-credential-helper/ecr-login/api"
+	"code.cloudfoundry.org/ecrhelper"
 	"github.com/containers/image/types"
 )
 
@@ -36,6 +34,7 @@ type Builder struct {
 	DockerUser                 string
 	DockerPassword             string
 	DockerEmail                string
+	ECRHelper                  ecrhelper.ECRHelper
 }
 
 func (builder *Builder) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
@@ -129,36 +128,26 @@ func (builder Builder) build() <-chan error {
 }
 
 func (builder Builder) getCredentials() (string, string, error) {
-	username := builder.DockerUser
-	password := builder.DockerPassword
-
-	rECRRepo, err := regexp.Compile(ECR_REPO_REGEX)
+	isECRRepo, err := builder.ECRHelper.IsECRRepo(builder.RegistryURL)
 	if err != nil {
 		return "", "", fmt.Errorf(
-			"failed to compile ECR repo regex: %s",
+			"failed to check whether the registry URL is ECR repo: %s",
 			err.Error(),
 		)
 	}
 
-	if rECRRepo.MatchString(builder.RegistryURL) {
-		os.Setenv("AWS_ACCESS_KEY_ID", builder.DockerUser)
-		os.Setenv("AWS_SECRET_ACCESS_KEY", builder.DockerPassword)
-
-		defer os.Unsetenv("AWS_ACCESS_KEY_ID")
-		defer os.Unsetenv("AWS_SECRET_ACCESS_KEY")
-
-		username, password, err = ecr.ECRHelper{
-			ClientFactory: ecrapi.DefaultClientFactory{},
-		}.Get(builder.RegistryURL)
-		if err != nil {
-			return "", "", fmt.Errorf(
-				"failed to get ECR credentials from [%s] due to %s",
-				builder.RegistryURL,
-				err.Error(),
-			)
-		}
+	if !isECRRepo {
+		return builder.DockerUser, builder.DockerPassword, nil
 	}
 
+	username, password, err := builder.ECRHelper.GetECRCredentials(builder.RegistryURL, builder.DockerUser, builder.DockerPassword)
+	if err != nil {
+		return "", "", fmt.Errorf(
+			"failed to get ECR credentials from [%s] due to %s",
+			builder.RegistryURL,
+			err.Error(),
+		)
+	}
 	return username, password, nil
 }
 
