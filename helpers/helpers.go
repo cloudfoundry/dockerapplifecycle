@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,7 @@ import (
 	"github.com/containers/image/image"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -84,16 +85,10 @@ func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, 
 		manifest.DockerV2Schema1MediaType,
 	}
 
-	imgSrc, err := ref.NewImageSource(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer imgSrc.Close()
-
 	var imageConfig *v1.Image
+	var imgSrc types.ImageSource
 	for i := 0; i < MAX_DOCKER_RETRIES; i++ {
-		var img types.Image
-		img, err = image.FromUnparsedImage(ctx, image.UnparsedInstance(imgSrc, nil))
+		imgSrc, err = ref.NewImageSource(context.Background(), ctx)
 		if err != nil && i < MAX_DOCKER_RETRIES-1 {
 			fmt.Fprintln(stderr, "Failed getting docker image manifest by tag:", err, " Going to retry attempt:", i+1)
 			continue
@@ -101,8 +96,22 @@ func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, 
 			fmt.Fprintln(stderr, "Failed getting docker image manifest by tag:", err)
 			continue
 		}
+		defer imgSrc.Close()
+		break
+	}
 
-		imageConfig, err = img.OCIConfig()
+	if imgSrc == (types.ImageSource)(nil) {
+		return nil, err
+	}
+
+	var img types.Image
+	img, err = image.FromUnparsedImage(context.Background(), ctx, image.UnparsedInstance(imgSrc, nil))
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < MAX_DOCKER_RETRIES; i++ {
+		imageConfig, err = img.OCIConfig(context.Background())
 		if err != nil && i < MAX_DOCKER_RETRIES-1 {
 			fmt.Fprintln(stderr, "Failed getting docker image config by tag:", err, " Going to retry attempt:", i+1)
 			continue

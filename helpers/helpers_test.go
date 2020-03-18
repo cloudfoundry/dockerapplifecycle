@@ -20,7 +20,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type serverResponseConfig struct {
@@ -226,10 +226,20 @@ var _ = Describe("Builder helpers", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		if serverConfig.WithSlowImageManifest {
+			slowImageManifestHandler := ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+serverConfig.ImageTag),
+				ghttp.RespondWith(418, "{\"details\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+			)
 			server.AppendHandlers(
-				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
-				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
-				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				slowImageManifestHandler,
+				ghttp.VerifyRequest("GET", "/v2/"),
+				slowImageManifestHandler,
+				ghttp.VerifyRequest("GET", "/v2/"),
+				slowImageManifestHandler,
+				ghttp.VerifyRequest("GET", "/v2/"),
+				// ghttp.RespondWith(418, "{\"details\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				// ghttp.RespondWith(418, "{\"details\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				// ghttp.RespondWith(418, "{\"details\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
 			)
 		}
 		verifyRequests := []http.HandlerFunc{
@@ -261,11 +271,16 @@ var _ = Describe("Builder helpers", func() {
 		server.AppendHandlers(
 			ghttp.CombineHandlers(verifyRequests...),
 		)
+
 		if serverConfig.WithSlowImageConfig {
+			slowImageConfigHandler := ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/v2/some_user/some_repo/blobs/%s", configDigest)),
+				ghttp.RespondWith(418, "{\"details\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+			)
 			server.AppendHandlers(
-				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
-				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
-				ghttp.RespondWith(418, "{\"message\": \"Push failed due to a network error. Please try again. If the problem persists, it may be due to a slow connection.\"}"),
+				slowImageConfigHandler,
+				slowImageConfigHandler,
+				slowImageConfigHandler,
 			)
 		}
 		verifyRequests = []http.HandlerFunc{
@@ -368,7 +383,7 @@ var _ = Describe("Builder helpers", func() {
 			}
 			for _, insecure := range insecureRegistries {
 				if registryURL == insecure {
-					ctx.DockerInsecureSkipTLSVerify = true
+					ctx.DockerInsecureSkipTLSVerify = types.OptionalBoolTrue
 				}
 			}
 
@@ -412,6 +427,7 @@ var _ = Describe("Builder helpers", func() {
 		Context("with an unknown tag", func() {
 			BeforeEach(func() {
 				server.AllowUnhandledRequests = true
+				server.SetUnhandledRequestStatusCode(http.StatusNotFound)
 				tag = "not_some_tag"
 			})
 
