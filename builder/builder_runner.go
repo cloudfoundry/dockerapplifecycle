@@ -72,7 +72,7 @@ func (builder Builder) build() <-chan error {
 		}
 		for _, insecure := range builder.InsecureDockerRegistries {
 			if builder.RegistryURL == insecure {
-				ctx.DockerInsecureSkipTLSVerify = true
+				ctx.DockerInsecureSkipTLSVerify = types.OptionalBoolTrue
 			}
 		}
 
