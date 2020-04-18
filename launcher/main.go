@@ -15,7 +15,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/cloudfoundry-incubator/credhub-cli/credhub"
+	"code.cloudfoundry.org/credhub-cli/credhub"
 
 	"code.cloudfoundry.org/buildpackapplifecycle/databaseuri"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
