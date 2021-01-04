@@ -385,13 +385,13 @@ var _ = Describe("Building", func() {
 
 				It("should exit successfully", func() {
 					session := setupBuilder()
-					Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+					Eventually(session, 30*time.Second).Should(gexec.Exit(0))
 				})
 
 				Describe("the json", func() {
 					It("should contain the execution metadata", func() {
 						session := setupBuilder()
-						Eventually(session, 10*time.Second).Should(gexec.Exit(0))
+						Eventually(session, 30*time.Second).Should(gexec.Exit(0))
 
 						result := resultJSON()
 
