@@ -123,7 +123,7 @@ var _ = Describe("Launcher", func() {
 
 	Context("when a start command is given with a workdir", func() {
 		BeforeEach(func() {
-			workdir = "/bin"
+			workdir = "/usr/bin"
 			launcherCmd.Args = []string{
 				"launcher",
 				appDir,
