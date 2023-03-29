@@ -12,7 +12,7 @@ import (
 	"regexp"
 
 	"code.cloudfoundry.org/tlsconfig"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
@@ -292,7 +292,7 @@ var _ = Describe("Launcher", func() {
 
 					It("returns an error", func() {
 						Eventually(session).Should(gexec.Exit(4))
-						Eventually(session.Err).Should(gbytes.Say("Unable to verify CredHub server"))
+						Eventually(session.Err).Should(gbytes.Say("Unable to interpolate credhub references"))
 						Eventually(session.Err).Should(gbytes.Say("certificate signed by unknown authority"))
 					})
 				})
