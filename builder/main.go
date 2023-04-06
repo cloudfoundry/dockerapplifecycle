@@ -144,7 +144,7 @@ func main() {
 	}
 
 	members := grouper.Members{
-		{"builder", ifrit.RunFunc(builder.Run)},
+		{Name: "builder", Runner: ifrit.RunFunc(builder.Run)},
 	}
 
 	group := grouper.NewParallel(os.Interrupt, members)

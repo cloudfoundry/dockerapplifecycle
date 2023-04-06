@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -216,8 +217,9 @@ func platformOptions() (*PlatformOptions, error) {
 }
 
 func formatCredHubErrorMessage(err error) string {
-	if typeErr, ok := err.(x509.UnknownAuthorityError); ok {
-		return fmt.Sprintf("Unable to verify CredHub server: %s", typeErr)
+	var unknownAuthErr *x509.UnknownAuthorityError
+	if errors.As(err, &unknownAuthErr) {
+		return fmt.Sprintf("Unable to verify CredHub server: %s", unknownAuthErr)
 	}
 
 	if typeErr, ok := err.(*url.Error); ok {
