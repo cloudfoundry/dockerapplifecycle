@@ -60,7 +60,8 @@ func ParseDockerRef(dockerRef string) (string, string, string) {
 // stolen from docker/docker
 // Get a repos name and returns the right reposName + tag
 // The tag can be confusing because of a port in a repository name.
-//     Ex: localhost.localdomain:5000/samalba/hipache:latest
+//
+//	Ex: localhost.localdomain:5000/samalba/hipache:latest
 func ParseRepositoryTag(repos string) (string, string) {
 	n := strings.LastIndex(repos, ":")
 	if n < 0 {
