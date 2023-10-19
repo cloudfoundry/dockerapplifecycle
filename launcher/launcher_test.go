@@ -142,16 +142,10 @@ var _ = Describe("Launcher", func() {
 			server       *ghttp.Server
 		)
 
-		pwd := func() string {
-			pwd, err := os.Getwd()
-			Expect(err).NotTo(HaveOccurred())
-			return pwd
-		}
-
 		tlsConfig := func() *tls.Config {
-			serverCertPath := path.Join(pwd(), "fixtures", "credhubserver.crt")
-			serverKeyPath := path.Join(pwd(), "fixtures", "credhubserver.key")
-			caCertPath := path.Join(pwd(), "fixtures", "ca-certs", "credhubtest.crt")
+			serverCertPath := path.Join("fixtures", "credhubserver.crt")
+			serverKeyPath := path.Join("fixtures", "credhubserver.key")
+			caCertPath := path.Join("fixtures", "ca-certs", "credhubtest.crt")
 
 			tlsConfig, err := tlsconfig.Build(
 				tlsconfig.WithInternalServiceDefaults(),
@@ -166,11 +160,11 @@ var _ = Describe("Launcher", func() {
 			server.HTTPTestServer.TLS = tlsConfig()
 			startCommand = "env; echo running app"
 
-			clientCertPath := path.Join(pwd(), "fixtures", "credhubclient.crt")
-			clientKeyPath := path.Join(pwd(), "fixtures", "credhubclient.key")
+			clientCertPath := path.Join("fixtures", "credhubclient.crt")
+			clientKeyPath := path.Join("fixtures", "credhubclient.key")
 
 			env := os.Environ()
-			caCertDir := path.Join(pwd(), "fixtures", "ca-certs")
+			caCertDir := path.Join("fixtures", "ca-certs")
 			env = append(env, fmt.Sprintf("CF_SYSTEM_CERT_PATH=%s", caCertDir))
 			env = append(env, fmt.Sprintf("CF_INSTANCE_CERT=%s", clientCertPath))
 			env = append(env, fmt.Sprintf("CF_INSTANCE_KEY=%s", clientKeyPath))
@@ -272,8 +266,8 @@ var _ = Describe("Launcher", func() {
 						server.Close()
 						server = ghttp.NewUnstartedServer()
 						server.HTTPTestServer.TLS = tlsConfig()
-						invalidCertPath := path.Join(pwd(), "fixtures", "invalid.crt")
-						invalidKeyPath := path.Join(pwd(), "fixtures", "invalid.key")
+						invalidCertPath := path.Join("fixtures", "invalid.crt")
+						invalidKeyPath := path.Join("fixtures", "invalid.key")
 						cert, err := tls.LoadX509KeyPair(invalidCertPath, invalidKeyPath)
 						Expect(err).NotTo(HaveOccurred())
 						server.HTTPTestServer.TLS.Certificates = []tls.Certificate{cert}
