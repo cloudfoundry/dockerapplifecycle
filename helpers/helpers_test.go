@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 
 	"code.cloudfoundry.org/dockerapplifecycle"
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
@@ -366,10 +367,10 @@ var _ = Describe("Builder helpers", func() {
 		})
 
 		JustBeforeEach(func() {
-			fixturesPath := path.Join(os.Getenv("DIEGO_RELEASE_DIR"), "src/code.cloudfoundry.org/dockerapplifecycle/helpers/fixtures")
-			tlsCA := path.Join(fixturesPath, "testCA.crt")
-			tlsCert := path.Join(fixturesPath, "localhost.cert")
-			tlsKey := path.Join(fixturesPath, "localhost.key")
+			fixturesPath := "fixtures"
+			tlsCA := filepath.Join(fixturesPath, "testCA.crt")
+			tlsCert := filepath.Join(fixturesPath, "localhost.cert")
+			tlsKey := filepath.Join(fixturesPath, "localhost.key")
 
 			ctx = &types.SystemContext{
 				DockerAuthConfig: &types.DockerAuthConfig{
