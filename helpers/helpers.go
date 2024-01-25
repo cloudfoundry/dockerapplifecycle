@@ -11,10 +11,10 @@ import (
 
 	"code.cloudfoundry.org/dockerapplifecycle"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
-	"github.com/containers/image/docker"
-	"github.com/containers/image/image"
-	"github.com/containers/image/manifest"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v5/docker"
+	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/types"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -81,6 +81,7 @@ func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, 
 	}
 
 	manifest.DefaultRequestedManifestMIMETypes = []string{
+		v1.MediaTypeImageManifest,
 		manifest.DockerV2Schema2MediaType,
 		manifest.DockerV2Schema1SignedMediaType,
 		manifest.DockerV2Schema1MediaType,

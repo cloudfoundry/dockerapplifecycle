@@ -11,7 +11,7 @@ import (
 	"code.cloudfoundry.org/dockerapplifecycle/helpers"
 	"code.cloudfoundry.org/dockerapplifecycle/protocol"
 	"code.cloudfoundry.org/ecrhelper"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v5/types"
 )
 
 const ECR_REPO_REGEX = `[a-zA-Z0-9][a-zA-Z0-9_-]*\.dkr\.ecr\.[a-zA-Z0-9][a-zA-Z0-9_-]*\.amazonaws\.com(\.cn)?[^ ]*`
