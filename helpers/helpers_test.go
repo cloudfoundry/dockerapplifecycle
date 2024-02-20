@@ -160,6 +160,7 @@ var _ = Describe("Builder helpers", func() {
 				ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+serverConfig.ImageTag),
 				ghttp.VerifyHeaderKV(
 					"Accept",
+					v1.MediaTypeImageManifest,
 					manifest.DockerV2Schema2MediaType,
 					manifest.DockerV2Schema1SignedMediaType,
 					manifest.DockerV2Schema1MediaType,
@@ -244,6 +245,7 @@ var _ = Describe("Builder helpers", func() {
 			ghttp.VerifyRequest("GET", "/v2/some_user/some_repo/manifests/"+serverConfig.ImageTag),
 			ghttp.VerifyHeaderKV(
 				"Accept",
+				v1.MediaTypeImageManifest,
 				manifest.DockerV2Schema2MediaType,
 				manifest.DockerV2Schema1SignedMediaType,
 				manifest.DockerV2Schema1MediaType,
