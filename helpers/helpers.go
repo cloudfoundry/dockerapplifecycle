@@ -81,6 +81,7 @@ func FetchMetadata(registryURL, repoName, tag string, ctx *types.SystemContext, 
 	}
 
 	manifest.DefaultRequestedManifestMIMETypes = []string{
+		v1.MediaTypeImageIndex,
 		v1.MediaTypeImageManifest,
 		manifest.DockerV2Schema2MediaType,
 		manifest.DockerV2Schema1SignedMediaType,
