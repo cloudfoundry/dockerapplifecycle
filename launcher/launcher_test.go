@@ -257,7 +257,7 @@ var _ = Describe("Launcher", func() {
 
 					It("prints an error indicating launcher cannot connect to credhub", func() {
 						Eventually(session).Should(gexec.Exit(4))
-						Eventually(session.Err).Should(gbytes.Say(fmt.Sprintf("connection refused")))
+						Eventually(session.Err).Should(gbytes.Say("connection refused"))
 					})
 				})
 
