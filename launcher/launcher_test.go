@@ -386,7 +386,7 @@ var _ = Describe("Launcher", func() {
 
 				It("does not attempt to do any credhub interpolation", func() {
 					Eventually(session).Should(gexec.Exit(0))
-					Eventually(string(session.Out.Contents())).Should(ContainSubstring(fmt.Sprintf(fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))))
+					Eventually(string(session.Out.Contents())).Should(ContainSubstring(fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue)))
 				})
 			})
 
@@ -402,7 +402,7 @@ var _ = Describe("Launcher", func() {
 
 				It("does not attempt to do any credhub interpolation", func() {
 					Eventually(session).Should(gexec.Exit(0))
-					Eventually(string(session.Out.Contents())).Should(ContainSubstring(fmt.Sprintf(fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue))))
+					Eventually(string(session.Out.Contents())).Should(ContainSubstring(fmt.Sprintf("VCAP_SERVICES=%s", vcapServicesValue)))
 				})
 			})
 
