@@ -171,7 +171,7 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 	interpolatedVcapServices, err := ch.InterpolateString(vcapServices)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, formatCredHubErrorMessage(err))
+		fmt.Fprint(os.Stderr, formatCredHubErrorMessage(err))
 		os.Exit(4)
 	}
 
