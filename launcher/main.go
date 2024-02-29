@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -192,7 +191,7 @@ func rootCAs() []string {
 	}
 	certs := []string{}
 	for _, m := range matches {
-		content, err := ioutil.ReadFile(m)
+		content, err := os.ReadFile(m)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to read system certs: %s", err)
 			os.Exit(4)

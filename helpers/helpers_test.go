@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -310,7 +309,7 @@ var _ = Describe("Builder helpers", func() {
 	}
 
 	resultJSON := func(filename string) []byte {
-		resultInfo, err := ioutil.ReadFile(filename)
+		resultInfo, err := os.ReadFile(filename)
 		Expect(err).NotTo(HaveOccurred())
 
 		return resultInfo
@@ -666,7 +665,7 @@ var _ = Describe("Builder helpers", func() {
 
 			BeforeEach(func() {
 				var err error
-				outputDir, err = ioutil.TempDir(os.TempDir(), "metadata")
+				outputDir, err = os.MkdirTemp(os.TempDir(), "metadata")
 				Expect(err).NotTo(HaveOccurred())
 			})
 
