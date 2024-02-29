@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -49,7 +48,7 @@ var _ = Describe("Launcher", func() {
 		os.Setenv("CALLERENV", "some-value")
 
 		var err error
-		appDir, err = ioutil.TempDir("", "app-dir")
+		appDir, err = os.MkdirTemp("", "app-dir")
 		Expect(err).NotTo(HaveOccurred())
 
 		workdir = "/"

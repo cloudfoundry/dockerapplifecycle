@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -105,7 +104,7 @@ var _ = Describe("Building", func() {
 	}
 
 	resultJSON := func() []byte {
-		resultInfo, err := ioutil.ReadFile(outputMetadataJSONFilename)
+		resultInfo, err := os.ReadFile(outputMetadataJSONFilename)
 		Expect(err).NotTo(HaveOccurred())
 
 		return resultInfo
@@ -126,7 +125,7 @@ var _ = Describe("Building", func() {
 		dockerPassword = ""
 		dockerEmail = ""
 
-		outputMetadataDir, err = ioutil.TempDir("", "building-result")
+		outputMetadataDir, err = os.MkdirTemp("", "building-result")
 		Expect(err).NotTo(HaveOccurred())
 
 		outputMetadataJSONFilename = path.Join(outputMetadataDir, "result.json")
