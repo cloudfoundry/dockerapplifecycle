@@ -32,7 +32,7 @@ const (
 
 func main() {
 	if len(os.Args) < 4 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <ignored> <start command> <metadata>", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <ignored> <start command> <metadata>\n", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -42,7 +42,7 @@ func main() {
 
 	platformOptions, err := platformOptions()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid platform options")
+		fmt.Fprintf(os.Stderr, "Invalid platform options\n")
 		os.Exit(3)
 	}
 
@@ -69,14 +69,18 @@ func main() {
 
 		mungedAppEnv, err := json.Marshal(vcapAppEnv)
 		if err == nil {
-			os.Setenv("VCAP_APPLICATION", string(mungedAppEnv))
+			err := os.Setenv("VCAP_APPLICATION", string(mungedAppEnv))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Couldn't set VCAP_APPLICATION env var: %s\n", err)
+				os.Exit(1)
+			}
 		}
 	}
 
 	var executionMetadata protocol.ExecutionMetadata
 	err = json.Unmarshal([]byte(metadata), &executionMetadata)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid metadata - %s", err)
+		fmt.Fprintf(os.Stderr, "Invalid metadata - %s\n", err)
 		os.Exit(1)
 	}
 
@@ -84,10 +88,14 @@ func main() {
 	if executionMetadata.Workdir != "" {
 		workdir = executionMetadata.Workdir
 	}
-	os.Chdir(workdir)
+	err = os.Chdir(workdir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Couldn't change directories to %s: %s\n", workdir, err)
+		os.Exit(1)
+	}
 
 	if len(executionMetadata.Entrypoint) == 0 && len(executionMetadata.Cmd) == 0 && startCommand == "" {
-		fmt.Fprintf(os.Stderr, "No start command found or specified")
+		fmt.Fprintf(os.Stderr, "No start command found or specified\n")
 		os.Exit(1)
 	}
 
@@ -101,7 +109,7 @@ func main() {
 		argv = append(executionMetadata.Entrypoint, executionMetadata.Cmd...)
 		argv[0], err = exec.LookPath(argv[0])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to resolve path: %s", err)
+			fmt.Fprintf(os.Stderr, "Failed to resolve path: %s\n", err)
 			os.Exit(1)
 		}
 	}
@@ -109,7 +117,7 @@ func main() {
 	runtime.GOMAXPROCS(1)
 	err = syscall.Exec(argv[0], argv, os.Environ())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to run: %s", err)
+		fmt.Fprintf(os.Stderr, "Failed to run: %s\n", err)
 		os.Exit(1)
 	}
 }
@@ -123,7 +131,7 @@ func setDatabaseURL() {
 	databaseURI := databaseuri.New()
 	creds, err := databaseURI.Credentials([]byte(vcapServices))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot parse vcap services: %s", err)
+		fmt.Fprintf(os.Stderr, "Cannot parse vcap services: %s\n", err)
 		return
 	}
 	uri := databaseURI.Uri(creds)
@@ -152,18 +160,18 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 	credhubURI := platformOptions.CredhubURI
 	_, err := url.ParseRequestURI(credhubURI)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid CredHub URI: '%s'", credhubURI)
+		fmt.Fprintf(os.Stderr, "Invalid CredHub URI: '%s'\n", credhubURI)
 		os.Exit(4)
 	}
 
 	if certPath == "" || keyPath == "" {
-		fmt.Fprintf(os.Stderr, "Unable to load instance identity credentials; CF_INSTANCE_CERT: '%s', CF_INSTANCE_KEY: '%s'", certPath, keyPath)
+		fmt.Fprintf(os.Stderr, "Unable to load instance identity credentials; CF_INSTANCE_CERT: '%s', CF_INSTANCE_KEY: '%s'\n", certPath, keyPath)
 		os.Exit(4)
 	}
 
 	ch, err := credhub.New(credhubURI, credhub.ClientCert(certPath, keyPath), credhub.CaCerts(rootCAs...))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to create a credhub client: %s", err)
+		fmt.Fprintf(os.Stderr, "Unable to create a credhub client: %s\n", err)
 		os.Exit(4)
 	}
 
@@ -176,7 +184,7 @@ func interpolateVCAPServices(platformOptions *PlatformOptions) {
 
 	err = os.Setenv("VCAP_SERVICES", interpolatedVcapServices)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot set environment variable: %s", err)
+		fmt.Fprintf(os.Stderr, "Cannot set environment variable: %s\n", err)
 		os.Exit(4)
 	}
 }
@@ -186,14 +194,14 @@ func rootCAs() []string {
 	pattern := path.Join(certsPath, "*.crt")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to locate system certs: %s", err)
+		fmt.Fprintf(os.Stderr, "Unable to locate system certs: %s\n", err)
 		os.Exit(4)
 	}
 	certs := []string{}
 	for _, m := range matches {
 		content, err := os.ReadFile(m)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to read system certs: %s", err)
+			fmt.Fprintf(os.Stderr, "Unable to read system certs: %s\n", err)
 			os.Exit(4)
 		}
 		certs = append(certs, string(content))
