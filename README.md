@@ -15,7 +15,7 @@ The **Launcher** executes the start command with the correct Cloud
 Foundry and docker environment.
 
 Read about the app lifecycle spec here:
-https://github.com/cloudfoundry/diego-design-notes\#app-lifecycles
+https://github.com/cloudfoundry/diego-design-notes#app-lifecycles
 
 > \[!NOTE\]
 >
